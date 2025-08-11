@@ -1,0 +1,9 @@
+[package]
+name = "beepauth"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8.4"
+tokio = { version = "1.47.1", features = ["rt-multi-thread"] }
+tower = "0.5.2"
