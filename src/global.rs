@@ -1,13 +1,15 @@
-use crate::database::PostgresDB;
+use crate::{database::PostgresDB, settings};
 
 #[derive(Debug)]
 pub struct GlobalState {
     pub database: sqlx::PgPool,
+    pub settings: settings::Settings,
 }
 
 impl GlobalState {
-    pub async fn new() -> anyhow::Result<Self> {
-        let database = PostgresDB::new().await?;
-        Ok(Self { database })
+    pub async fn new(settings: settings::Settings) -> anyhow::Result<Self> {
+        let database = PostgresDB::new(&settings.database).await?;
+
+        Ok(Self { database, settings })
     }
 }

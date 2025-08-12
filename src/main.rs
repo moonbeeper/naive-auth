@@ -17,14 +17,16 @@ mod auth;
 mod database;
 mod global;
 mod http;
+mod settings;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt().init();
     tracing::info!("heelo");
+    let settings = settings::Settings::load().expect("Failed to load settings");
     // let app = Router::new().route("/", get(|| async { "Hello, World!" }));
 
-    let global = GlobalState::new()
+    let global = GlobalState::new(settings)
         .await
         .expect("Failed to initialize global state");
     let global = Arc::new(global);

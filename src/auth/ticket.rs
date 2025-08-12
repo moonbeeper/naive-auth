@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 
 use crate::{
@@ -34,35 +34,45 @@ impl From<&Session> for AuthTicket {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct Claims {
     jti: String,
-    exp: usize,
-    iat: usize,
+    exp: i64,
+    iat: i64,
     iss: String,
-    nbf: usize,
+    nbf: i64,
     sub: String,
 }
 
 impl AuthTicket {
-    pub fn generate(&self, _global: &Arc<GlobalState>) -> anyhow::Result<String> {
+    pub fn generate(&self, global: &Arc<GlobalState>) -> anyhow::Result<String> {
         let claims = Claims {
             sub: self.user_id.to_string(),
-            iat: self.issued_at.timestamp() as usize,
-            nbf: self.issued_at.timestamp() as usize,
-            exp: self.expiration.timestamp() as usize,
-            iss: "hardcoded.localhost".to_string(),
+            iat: self.issued_at.timestamp(),
+            nbf: self.issued_at.timestamp(),
+            exp: self.expiration.timestamp(),
+            iss: global
+                .settings
+                .session
+                .jwt
+                .issuer
+                .clone()
+                .unwrap_or_else(|| global.settings.http.origin.clone()),
             jti: self.session_id.to_string(),
         };
 
-        let secret = "this is still hardcoded".as_bytes();
-        let key = EncodingKey::from_secret(secret);
+        let key = EncodingKey::from_secret(global.settings.session.jwt.secret.as_bytes());
         Ok(encode(&Header::new(Algorithm::HS256), &claims, &key)?)
     }
 
-    pub fn validate(token: &str, _global: &Arc<GlobalState>) -> anyhow::Result<Self> {
-        let secret = "this is still hardcoded".as_bytes();
-        let decoding_key = DecodingKey::from_secret(secret);
+    pub fn validate(token: &str, global: &Arc<GlobalState>) -> anyhow::Result<Self> {
+        let decoding_key = DecodingKey::from_secret(global.settings.session.jwt.secret.as_bytes());
 
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.set_issuer(&["hardcoded.localhost"]);
+        validation.set_issuer(&[global
+            .settings
+            .session
+            .jwt
+            .issuer
+            .clone()
+            .unwrap_or_else(|| global.settings.http.origin.clone())]);
 
         let token_data = decode::<Claims>(token, &decoding_key, &validation)?;
         let claims = token_data.claims;
@@ -74,10 +84,10 @@ impl AuthTicket {
         Ok(Self {
             user_id,
             session_id,
-            issued_at: chrono::DateTime::from_timestamp(claims.iat as i64, 0)
-                .ok_or(anyhow!("Invalid issued at timestamp"))?,
-            expiration: chrono::DateTime::from_timestamp(claims.exp as i64, 0)
-                .ok_or(anyhow!("Invalid expiration timestamp"))?,
+            issued_at: chrono::DateTime::from_timestamp(claims.iat, 0)
+                .ok_or_else(|| anyhow!("Invalid issued at timestamp"))?,
+            expiration: chrono::DateTime::from_timestamp(claims.exp, 0)
+                .ok_or_else(|| anyhow!("Invalid expiration timestamp"))?,
         })
     }
 }

@@ -20,9 +20,9 @@ impl Session {
         sqlx::query!(
             "
             insert into
-                sessions (id, user_id, name, active_expires_at, inactive_expires_at)
+                sessions (id, user_id, name, active_expires_at, inactive_expires_at, updated_at, created_at)
             values
-                ($1, $2, $3, $4, $5)
+                ($1, $2, $3, $4, $5, now(), now())
             ",
             self.id as SessionId,
             self.user_id as UserId,
@@ -70,6 +70,21 @@ impl Session {
         )
         .execute(&mut **transaction)
         .await?;
+
+        Ok(())
+    }
+
+    // always returns Ok even if the requested session does not exist
+    pub async fn delete(id: SessionId, transaction: &mut PgTransaction<'_>) -> DatabaseError<()> {
+        let session = Self::get(id, &mut **transaction).await?;
+        if let Some(session) = session {
+            sqlx::query!(
+                "delete from sessions where id = $1",
+                session.id as SessionId
+            )
+            .execute(&mut **transaction)
+            .await?;
+        }
 
         Ok(())
     }

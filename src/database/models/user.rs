@@ -29,7 +29,7 @@ impl User {
             self.display_name,
             self.email,
             self.email_verified,
-            self.password_hash.as_ref().map(|hash| hash.as_str()),
+            self.password_hash.as_ref().map(String::as_str),
         )
         .execute(&mut **transaction)
         .await?;

@@ -10,11 +10,10 @@ use axum::{
 };
 use futures_util::future::BoxFuture;
 use tower::Service;
-use tower_cookies::{Cookie, Cookies};
-use tracing::Instrument;
+use tower_cookies::Cookies;
 
 use crate::{
-    auth::{SESSION_COOKIE_NAME, ticket::AuthTicket},
+    auth::{build_cookie, ticket::AuthTicket},
     database::models::{
         session::{Session, SessionId},
         user::UserId,
@@ -33,21 +32,21 @@ pub enum AuthContext {
 }
 
 impl AuthContext {
-    pub fn user_id(&self) -> Option<UserId> {
+    pub const fn user_id(&self) -> Option<UserId> {
         match self {
             Self::Authenticated { user_id, .. } => Some(*user_id),
             Self::NotAuthenticated => None,
         }
     }
 
-    pub fn session_id(&self) -> Option<SessionId> {
+    pub const fn session_id(&self) -> Option<SessionId> {
         match self {
             Self::Authenticated { session_id, .. } => Some(*session_id),
             Self::NotAuthenticated => None,
         }
     }
 
-    pub fn is_authenticated(&self) -> bool {
+    pub const fn is_authenticated(&self) -> bool {
         matches!(self, Self::Authenticated { .. }) // no need to use mr if statements wohoo
     }
 }
@@ -78,37 +77,36 @@ pub struct AuthManagerMiddleware<S> {
     global: Arc<GlobalState>,
 }
 
-impl<S> AuthManagerMiddleware<S> {
+impl<S: Send + Sync + 'static> AuthManagerMiddleware<S> {
+    #[allow(clippy::cognitive_complexity)]
     async fn do_something(&self, cookies: &Cookies) -> HttpResult<AuthContext> {
-        let Some(session_cookie) = cookies.get(SESSION_COOKIE_NAME) else {
+        let cookie_name = self.global.settings.session.cookie_name.clone();
+        let Some(session_cookie) = cookies.get(cookie_name.as_str()) else {
             return Ok(AuthContext::NotAuthenticated);
         };
 
         let token_value = session_cookie.value().to_string();
-        tracing::info!("session cookie found");
+        tracing::debug!("session cookie found");
 
         let Ok(token) = AuthTicket::validate(&token_value, &self.global) else {
             tracing::debug!("invalid token");
-            let cookie = Cookie::build((SESSION_COOKIE_NAME, "")).path("/");
-            cookies.remove(cookie.into());
+            // let cookie = Cookie::build((self.global.settings.session.cookie_name.as_str(), "")).path("/");
+            cookies.remove(cookie_name.into());
             return Ok(AuthContext::NotAuthenticated);
         };
 
-        let session = match Session::get(token.session_id, &self.global.database).await {
-            Ok(Some(session)) => session,
-            _ => {
-                let cookie = Cookie::build((SESSION_COOKIE_NAME, "")).path("/");
-                cookies.remove(cookie.into());
-                return Ok(AuthContext::NotAuthenticated);
-            }
+        let Ok(Some(session)) = Session::get(token.session_id, &self.global.database).await else {
+            // let cookie = Cookie::build((&cookie_name, "")).path("/");
+            cookies.remove(cookie_name.into());
+            return Ok(AuthContext::NotAuthenticated);
         };
 
         tracing::debug!("session found");
 
         if session.is_expired() {
             tracing::debug!("session is expired");
-            let cookie = Cookie::build((SESSION_COOKIE_NAME, "")).path("/");
-            cookies.remove(cookie.into());
+            // let cookie = Cookie::build((SESSION_COOKIE_NAME, "")).path("/");
+            cookies.remove(cookie_name.into());
             return Ok(AuthContext::NotAuthenticated);
         }
 
@@ -122,6 +120,15 @@ impl<S> AuthManagerMiddleware<S> {
             };
             session.update(&mut tx).await?;
             tx.commit().await?;
+
+            let ticket = AuthTicket::from(&session).generate(&self.global)?;
+            let cookie = build_cookie(
+                cookie_name,
+                self.global.settings.session.inactive_age,
+                self.global.settings.http.domain.clone(),
+                ticket,
+            );
+            cookies.add(cookie);
         }
 
         Ok(AuthContext::Authenticated {
@@ -153,22 +160,21 @@ where
         let clone = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, clone);
 
-        Box::pin(
-            async move {
-                let Some(cookies) = request.extensions().get::<Cookies>().cloned() else {
-                    tracing::error!("missing cookies in request extension????");
-                    return Ok(Response::default());
-                };
+        Box::pin(async move {
+            let guard = span.enter();
+            let Some(cookies) = request.extensions().get::<Cookies>().cloned() else {
+                tracing::error!("missing cookies in request extension????");
+                return Ok(Response::default());
+            };
 
-                let auth_context = match this.do_something(&cookies).await {
-                    Ok(context) => context,
-                    Err(e) => return Ok(e.into_response()),
-                };
-                request.extensions_mut().insert(auth_context);
+            let auth_context = match this.do_something(&cookies).await {
+                Ok(context) => context,
+                Err(e) => return Ok(e.into_response()),
+            };
+            request.extensions_mut().insert(auth_context);
 
-                inner.call(request).await.map_err(Into::into)
-            }
-            .instrument(span),
-        )
+            drop(guard);
+            inner.call(request).await
+        })
     }
 }

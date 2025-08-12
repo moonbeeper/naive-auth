@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 
 use axum::{Router, routing::get};
 use tokio::{net::TcpSocket, sync::oneshot};
@@ -28,14 +28,14 @@ pub async fn run(
     global: Arc<GlobalState>,
     shutdown_signal: oneshot::Receiver<()>,
 ) -> anyhow::Result<()> {
-    tracing::info!("Listening on http://localhost:8080");
+    tracing::info!("Listening on http://{}", global.settings.http.bind);
 
     let socket = TcpSocket::new_v4()?;
 
     socket.set_reuseaddr(true)?;
     socket.set_nodelay(true)?;
 
-    socket.bind(SocketAddr::from(([127, 0, 0, 1], 8080)))?;
+    socket.bind(global.settings.http.bind)?;
     let listener = socket.listen(1024)?;
 
     axum::serve(listener, routes(&global))
