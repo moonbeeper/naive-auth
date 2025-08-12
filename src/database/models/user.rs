@@ -1,17 +1,26 @@
 use sqlx::{PgExecutor, PgTransaction};
+use typed_builder::TypedBuilder;
 
 use crate::database::{DatabaseError, ulid::Ulid};
 
 pub type UserId = Ulid;
 
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct User {
+    #[builder(default = UserId::new())]
     pub id: UserId,
     pub login: String,
-    pub display_name: String,
+    #[builder(default, setter(strip_option))]
+    pub display_name: Option<String>,
+    #[builder(setter(strip_option))]
     pub email: Option<String>,
+    #[builder(default)]
     pub email_verified: bool,
+    #[builder(setter(strip_option))]
     pub password_hash: Option<String>,
+    #[builder(default)]
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[builder(default)]
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 

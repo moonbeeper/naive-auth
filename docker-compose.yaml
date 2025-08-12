@@ -9,6 +9,18 @@ services:
       POSTGRES_USER: beep
       POSTGRES_PASSWORD: beep
       POSTGRES_DB: beep_auth
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - 1025:1025
+      - 8025:8025
+    volumes:
+      - 'mailpit-data:/data'
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
 
 volumes:
   db-data:
+  mailpit-data:

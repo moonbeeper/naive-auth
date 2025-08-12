@@ -1,20 +1,21 @@
-use std::sync::Arc;
+use std::{str::FromStr as _, sync::Arc};
 
 use argon2::{
     Argon2, PasswordHash, PasswordHasher as _, PasswordVerifier as _, password_hash::SaltString,
 };
 use axum::{Extension, Json, Router, extract::State, routing::post};
+use axum_valid::Valid;
+use lettre::message::Mailbox;
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
+use validator::Validate;
 
 use crate::{
     auth::{self, middleware::AuthContext, ops::remove_session, ticket::AuthTicket},
-    database::models::{
-        session::{Session, SessionId},
-        user::{User, UserId},
-    },
+    database::models::{session::Session, user::User},
+    email::resources::AuthEmails,
     global::GlobalState,
-    http::{HttpResult, error::ApiError},
+    http::{HttpResult, error::ApiError, v1::models},
 };
 
 pub fn routes() -> Router<Arc<GlobalState>> {
@@ -23,10 +24,11 @@ pub fn routes() -> Router<Arc<GlobalState>> {
         .route("/register", post(register))
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, Validate)]
 struct LoginPassword {
     #[serde(rename = "login")]
     login_or_email: String,
+    #[validate(length(min = 9))]
     password: String,
 }
 
@@ -35,7 +37,7 @@ async fn login(
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
     Json(request): Json<LoginPassword>,
-) -> HttpResult<&'static str> {
+) -> HttpResult<Json<models::auth::Session>> {
     remove_session(session, &cookies, &global).await?; // force logout
 
     let user =
@@ -49,6 +51,15 @@ async fn login(
             user.unwrap()
         };
 
+    // todo: user email man to send the typical email alerts and verification before allowing login. (redis)
+    global
+        .mailer
+        .send(
+            Mailbox::from_str(&user.email.unwrap())?,
+            AuthEmails::TestEmail,
+        )
+        .await?;
+
     if user.password_hash.is_none() {
         Err(ApiError::InvalidLogin)?;
     }
@@ -61,12 +72,40 @@ async fn login(
         )
         .map_err(|_| ApiError::InvalidLogin)?;
 
-    Ok("alright you are logged into the mainframe")
+    let session = Session::builder()
+        .user_id(user.id)
+        .name("temporary".into())
+        .active_expires_at(
+            chrono::Utc::now() + chrono::Duration::seconds(global.settings.session.active_age),
+        )
+        .inactive_expires_at(
+            chrono::Utc::now() + chrono::Duration::seconds(global.settings.session.inactive_age),
+        )
+        .build();
+
+    let mut tx = global.database.begin().await?;
+    session.insert(&mut tx).await?;
+    tx.commit().await?;
+
+    let ticket = AuthTicket::from(&session).generate(&global)?;
+    let cookie = auth::build_cookie(
+        global.settings.session.cookie_name.clone(),
+        global.settings.session.inactive_age,
+        global.settings.http.domain.clone(),
+        ticket,
+    );
+    cookies.add(cookie);
+
+    Ok(Json(models::auth::Session::from(session)))
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, Validate)]
 struct RegisterPassword {
+    #[validate(email)]
     email: String,
+    #[validate(length(min = 6))]
+    login: String,
+    #[validate(length(min = 9))]
     password: String,
 }
 
@@ -74,8 +113,8 @@ async fn register(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
-    Json(request): Json<RegisterPassword>,
-) -> HttpResult<&'static str> {
+    Valid(Json(request)): Valid<Json<RegisterPassword>>,
+) -> HttpResult<Json<models::auth::Session>> {
     remove_session(session, &cookies, &global).await?; // force logout
 
     if User::get_by_email(&request.email, &global.database)
@@ -85,40 +124,29 @@ async fn register(
         return Err(ApiError::UserAlreadyExists);
     }
 
-    let login = request
-        .email
-        .split('@')
-        .next()
-        .unwrap_or(&request.email)
-        .to_string();
-
     let argon2 = Argon2::default();
     let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());
     let password_hash = argon2
         .hash_password(request.password.as_bytes(), &salt)?
         .to_string();
 
-    // todo: Create builders
-    let user = User {
-        id: UserId::new(),
-        login,
-        display_name: String::new(),
-        email: Some(request.email.clone()),
-        email_verified: false,
-        password_hash: Some(password_hash),
-        updated_at: chrono::Utc::now(),
-        created_at: chrono::Utc::now(),
-    };
+    let user = User::builder()
+        .login(request.login.clone())
+        .email(request.email.clone())
+        .email_verified(false)
+        .password_hash(password_hash)
+        .build();
 
-    let session = Session {
-        id: SessionId::new(),
-        user_id: user.id,
-        name: "temporary".to_string(),
-        active_expires_at: chrono::Utc::now() + chrono::Duration::days(7),
-        inactive_expires_at: chrono::Utc::now() + chrono::Duration::days(30),
-        updated_at: chrono::Utc::now(),
-        created_at: chrono::Utc::now(),
-    };
+    let session = Session::builder()
+        .user_id(user.id)
+        .name("temporary".into())
+        .active_expires_at(
+            chrono::Utc::now() + chrono::Duration::seconds(global.settings.session.active_age),
+        )
+        .inactive_expires_at(
+            chrono::Utc::now() + chrono::Duration::seconds(global.settings.session.inactive_age),
+        )
+        .build();
 
     let mut tx = global.database.begin().await?;
     user.insert(&mut tx).await?;
@@ -134,5 +162,5 @@ async fn register(
     );
     cookies.add(cookie);
 
-    Ok("alright you are now registered into the mainframe")
+    Ok(Json(models::auth::Session::from(session)))
 }

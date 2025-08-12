@@ -5,6 +5,7 @@ use axum::Router;
 use crate::global::GlobalState;
 
 mod auth;
+pub mod models;
 
 pub fn routes() -> Router<Arc<GlobalState>> {
     Router::new().nest("/auth", auth::routes())

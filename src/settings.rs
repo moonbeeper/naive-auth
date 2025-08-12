@@ -40,11 +40,37 @@ pub struct JwtSettings {
     pub issuer: Option<String>,
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]
+pub struct EmailSettings {
+    #[default("BeepAuth")]
+    pub display_name: String,
+    #[default("no-reply")]
+    pub user: String,
+    #[default("example.com")]
+    pub domain: String,
+    pub server: EmailServer,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]
+pub struct EmailServer {
+    #[default("any")]
+    pub smtp_username: String,
+    #[default("any")]
+    pub smtp_password: String,
+    #[default("localhost")]
+    pub smtp_host: String,
+    #[default(1025)]
+    pub smtp_port: u16,
+    #[default(false)]
+    pub smtp_tls: bool,
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub struct Settings {
     pub http: HttpSettings,
     pub database: DatabaseSettings,
     pub session: SessionSettings,
+    pub email: EmailSettings,
 }
 
 impl Settings {

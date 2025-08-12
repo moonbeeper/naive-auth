@@ -1,17 +1,21 @@
 use sqlx::{PgExecutor, PgTransaction};
+use typed_builder::TypedBuilder;
 
 use crate::database::{DatabaseError, models::user::UserId, ulid::Ulid};
 
 pub type SessionId = Ulid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct Session {
+    #[builder(default = SessionId::new())]
     pub id: SessionId,
     pub user_id: UserId,
     pub name: String,
     pub active_expires_at: chrono::DateTime<chrono::Utc>,
     pub inactive_expires_at: chrono::DateTime<chrono::Utc>,
+    #[builder(default)]
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[builder(default)]
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -87,6 +91,21 @@ impl Session {
         }
 
         Ok(())
+    }
+
+    pub async fn list_user_sessions<'a, E>(id: UserId, executor: E) -> DatabaseError<Vec<Self>>
+    where
+        E: PgExecutor<'a>,
+    {
+        let sessions = sqlx::query_as!(
+            Session,
+            "select * from sessions where user_id = $1 order by created_at desc limit 100",
+            id as UserId
+        )
+        .fetch_all(executor)
+        .await?;
+
+        Ok(sessions)
     }
 
     pub fn is_expired(&self) -> bool {

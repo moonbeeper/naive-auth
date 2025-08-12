@@ -20,6 +20,8 @@ pub enum ApiError {
     UserAlreadyExists,
     #[error("Unknown error: {0}")]
     Unknown(#[from] anyhow::Error),
+    #[error("Failed to send email because of: {0}")]
+    EmailError(#[from] lettre::address::AddressError),
 }
 
 impl ApiError {
@@ -32,6 +34,7 @@ impl ApiError {
             Self::PasswordHashing(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Self::UserAlreadyExists => axum::http::StatusCode::BAD_REQUEST,
             Self::Unknown(_) => axum::http::StatusCode::IM_A_TEAPOT,
+            Self::EmailError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

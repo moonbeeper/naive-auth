@@ -18,6 +18,7 @@ mod database;
 mod global;
 mod http;
 mod settings;
+mod email;
 
 #[tokio::main]
 async fn main() {
