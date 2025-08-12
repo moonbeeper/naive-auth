@@ -2,18 +2,25 @@ use std::{net::SocketAddr, sync::Arc};
 
 use axum::{Router, routing::get};
 use tokio::{net::TcpSocket, sync::oneshot};
+use tower::ServiceBuilder;
+use tower_cookies::CookieManagerLayer;
 
-use crate::global::GlobalState;
+use crate::{auth::middleware::AuthManagerLayer, global::GlobalState};
 
-mod error;
+pub mod error;
 mod v1;
 
-type HttpResult<T> = Result<T, error::ApiError>;
+pub type HttpResult<T> = Result<T, error::ApiError>;
 
 fn routes(global: &Arc<GlobalState>) -> Router {
     Router::new()
         .nest("/v1", v1::routes())
         .route("/", get(|| async { "Hello, World!" }))
+        .layer(
+            ServiceBuilder::new()
+                .layer(CookieManagerLayer::new())
+                .layer(AuthManagerLayer::new(global.clone())),
+        )
         .with_state(global.clone())
 }
 

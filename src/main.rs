@@ -13,6 +13,7 @@ use tokio::sync::oneshot;
 
 use crate::global::GlobalState;
 
+mod auth;
 mod database;
 mod global;
 mod http;

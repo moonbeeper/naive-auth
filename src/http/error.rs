@@ -1,4 +1,5 @@
 use axum::{Json, response::IntoResponse};
+use sqlx::any;
 
 #[derive(Debug, serde::Serialize)]
 struct HttpError<'a> {
@@ -18,6 +19,8 @@ pub enum ApiError {
     PasswordHashing(#[from] argon2::password_hash::Error),
     #[error("User already exists")]
     UserAlreadyExists,
+    #[error("Unknown error: {0}")]
+    Unknown(#[from] anyhow::Error),
 }
 
 impl ApiError {
@@ -28,6 +31,7 @@ impl ApiError {
             ApiError::InvalidUser => "Invalid login",
             ApiError::PasswordHashing(_) => "Password hashing error",
             ApiError::UserAlreadyExists => "User already exists",
+            ApiError::Unknown(_) => "Unknown error",
         }
     }
     fn status_code(&self) -> axum::http::StatusCode {
@@ -37,6 +41,7 @@ impl ApiError {
             ApiError::InvalidUser => axum::http::StatusCode::UNAUTHORIZED,
             ApiError::PasswordHashing(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::UserAlreadyExists => axum::http::StatusCode::BAD_REQUEST,
+            ApiError::Unknown(_) => axum::http::StatusCode::IM_A_TEAPOT,
         }
     }
 }

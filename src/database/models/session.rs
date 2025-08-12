@@ -1,17 +1,18 @@
-use sqlx::PgTransaction;
+use sqlx::{PgExecutor, PgTransaction};
 
-use crate::database::{models::user::UserId, ulid::Ulid};
+use crate::database::{DatabaseError, models::user::UserId, ulid::Ulid};
 
-type SessionId = Ulid;
+pub type SessionId = Ulid;
 
+#[derive(Debug, Clone)]
 pub struct Session {
-    id: SessionId,
-    user_id: UserId,
-    name: String,
-    active_expires: chrono::DateTime<chrono::Utc>,
-    inactive_expires: chrono::DateTime<chrono::Utc>,
-    updated_at: chrono::DateTime<chrono::Utc>,
-    created_at: chrono::DateTime<chrono::Utc>,
+    pub id: SessionId,
+    pub user_id: UserId,
+    pub name: String,
+    pub active_expires_at: chrono::DateTime<chrono::Utc>,
+    pub inactive_expires_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl Session {
@@ -26,12 +27,58 @@ impl Session {
             self.id as SessionId,
             self.user_id as UserId,
             self.name,
-            self.active_expires,
-            self.inactive_expires
+            self.active_expires_at,
+            self.inactive_expires_at
         )
         .execute(&mut **transaction)
         .await?;
 
         Ok(())
+    }
+
+    pub async fn get<'a, E>(id: SessionId, executor: E) -> DatabaseError<Option<Self>>
+    where
+        E: PgExecutor<'a>,
+    {
+        let user = sqlx::query_as!(
+            Session,
+            "select * from sessions where id = $1",
+            id as SessionId
+        )
+        .fetch_optional(executor)
+        .await?;
+        Ok(user)
+    }
+
+    pub async fn update(&self, transaction: &mut PgTransaction<'_>) -> DatabaseError<()> {
+        sqlx::query!(
+            "
+            update sessions
+                set
+                    user_id = $1,
+                    name = $2,
+                    active_expires_at = $3,
+                    inactive_expires_at = $4,
+                    updated_at = now()
+            where id = $5
+            ",
+            self.user_id as UserId,
+            self.name,
+            self.active_expires_at,
+            self.inactive_expires_at,
+            self.id as SessionId,
+        )
+        .execute(&mut **transaction)
+        .await?;
+
+        Ok(())
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.inactive_expires_at <= chrono::Utc::now()
+    }
+
+    pub fn is_active(&self) -> bool {
+        chrono::Utc::now() <= self.active_expires_at
     }
 }

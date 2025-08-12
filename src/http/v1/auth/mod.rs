@@ -2,14 +2,19 @@ use std::sync::Arc;
 
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier, password_hash::SaltString};
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     extract::State,
     routing::{get, post},
 };
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng};
+use tower_cookies::Cookies;
 
 use crate::{
-    database::models::user::{User, UserId},
+    auth::{self, middleware::AuthContext, ticket::AuthTicket},
+    database::models::{
+        session::{Session, SessionId},
+        user::{User, UserId},
+    },
     global::GlobalState,
     http::{HttpResult, error::ApiError},
 };
@@ -19,6 +24,7 @@ pub fn routes() -> Router<Arc<GlobalState>> {
         .route("/", get(index))
         .route("/login", post(login))
         .route("/register", post(register))
+        .route("/test", get(test))
 }
 
 async fn index() -> &'static str {
@@ -59,7 +65,7 @@ async fn login(
         )
         .map_err(|_| ApiError::InvalidUser)?;
 
-    Ok("alright you are logged into the mainframe") // todo: Session management middleware and methods
+    Ok("alright you are logged into the mainframe")
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -70,6 +76,7 @@ struct RegisterPassword {
 
 async fn register(
     State(global): State<Arc<GlobalState>>,
+    cookies: Cookies,
     Json(request): Json<RegisterPassword>,
 ) -> HttpResult<&'static str> {
     if User::get_by_email(&request.email, &global.database)
@@ -92,6 +99,7 @@ async fn register(
         .hash_password(&request.password.as_bytes(), &salt)?
         .to_string();
 
+    // todo: Create builders
     let user = User {
         id: UserId::new(),
         login,
@@ -103,9 +111,39 @@ async fn register(
         created_at: chrono::Utc::now(),
     };
 
+    let session = Session {
+        id: SessionId::new(),
+        user_id: user.id,
+        name: "temporary".to_string(),
+        active_expires_at: chrono::Utc::now() + chrono::Duration::days(7),
+        inactive_expires_at: chrono::Utc::now() + chrono::Duration::days(30),
+        updated_at: chrono::Utc::now(),
+        created_at: chrono::Utc::now(),
+    };
+
     let mut tx = global.database.begin().await?;
     user.insert(&mut tx).await?;
+    session.insert(&mut tx).await?;
     tx.commit().await?;
 
-    Ok("alright you are now registered into the mainframe") // todo: Session management middleware and methods
+    let ticket = AuthTicket::from(&session).generate(&global)?;
+    let cookie = auth::build_cookie(ticket);
+    cookies.add(cookie);
+
+    Ok("alright you are now registered into the mainframe")
+}
+
+async fn test(
+    State(_global): State<Arc<GlobalState>>,
+    Extension(auth_context): Extension<AuthContext>,
+) -> String {
+    match auth_context {
+        AuthContext::Authenticated {
+            user_id,
+            session_id,
+        } => {
+            format!("user_id: {user_id}, session_id: {session_id}")
+        }
+        AuthContext::NotAuthenticated => "not authenticated".to_string(),
+    }
 }

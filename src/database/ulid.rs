@@ -1,3 +1,5 @@
+use std::{fmt::Display, str::FromStr};
+
 use sqlx::{
     encode::IsNull,
     error::BoxDynError,
@@ -69,5 +71,19 @@ impl sqlx::Decode<'_, sqlx::Postgres> for Ulid {
 impl Ulid {
     pub fn new() -> Self {
         Self(ulid::Ulid::new())
+    }
+}
+
+impl FromStr for Ulid {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(ulid::Ulid::from_str(s)?))
+    }
+}
+
+impl Display for Ulid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
