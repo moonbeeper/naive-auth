@@ -32,19 +32,19 @@ pub enum AuthContext {
 }
 
 impl AuthContext {
-    pub const fn user_id(&self) -> Option<UserId> {
+    pub const fn user_id(&self) -> UserId {
         match self {
-            Self::Authenticated { user_id, .. } => Some(*user_id),
-            Self::NotAuthenticated => None,
+            Self::Authenticated { user_id, .. } => *user_id,
+            Self::NotAuthenticated => UserId::nil(),
         }
     }
 
-    // pub const fn session_id(&self) -> Option<SessionId> {
-    //     match self {
-    //         Self::Authenticated { session_id, .. } => Some(*session_id),
-    //         Self::NotAuthenticated => None,
-    //     }
-    // }
+    pub const fn session_id(&self) -> SessionId {
+        match self {
+            Self::Authenticated { session_id, .. } => *session_id,
+            Self::NotAuthenticated => SessionId::nil(),
+        }
+    }
 
     pub const fn is_authenticated(&self) -> bool {
         matches!(self, Self::Authenticated { .. }) // no need to use mr if statements wohoo

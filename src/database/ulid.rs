@@ -12,7 +12,7 @@ pub struct Ulid(pub ulid::Ulid);
 
 impl Default for Ulid {
     fn default() -> Self {
-        Self(ulid::Ulid::nil())
+        Self::nil()
     }
 }
 
@@ -72,6 +72,10 @@ impl sqlx::Decode<'_, sqlx::Postgres> for Ulid {
 impl Ulid {
     pub fn new() -> Self {
         Self(ulid::Ulid::new())
+    }
+
+    pub const fn nil() -> Self {
+        Self(ulid::Ulid::nil())
     }
 }
 

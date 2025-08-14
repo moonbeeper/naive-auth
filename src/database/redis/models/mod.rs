@@ -1,4 +1,4 @@
-use fred::{prelude::KeysInterface as _, types::Expiration};
+use fred::{prelude::KeysInterface, types::Expiration};
 
 use crate::database::ulid::Ulid;
 

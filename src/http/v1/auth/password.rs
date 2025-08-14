@@ -12,9 +12,15 @@ use validator::Validate;
 use crate::{
     auth::{
         middleware::AuthContext,
-        ops::{create_session, remove_session},
+        ops::{
+            TotpResponse, create_session, create_totp_exchange, get_totp_client, remove_session,
+            totp_secret,
+        },
     },
-    database::models::user::User,
+    database::{
+        models::user::User,
+        redis::models::auth::{AuthFlow, AuthFlowKey, AuthFlowNamespace},
+    },
     email::resources::AuthEmails,
     global::GlobalState,
     http::{HttpResult, error::ApiError, v1::models},
@@ -39,7 +45,7 @@ async fn login(
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
     Valid(Json(request)): Valid<Json<LoginPassword>>,
-) -> HttpResult<Json<models::auth::Session>> {
+) -> HttpResult<Json<either::Either<models::Session, TotpResponse<'static>>>> {
     remove_session(session, &cookies, &global).await?; // force logout
     let login = any_ascii::any_ascii(&request.login_or_email);
 
@@ -51,6 +57,25 @@ async fn login(
     } else {
         return Err(ApiError::InvalidLogin);
     };
+
+    if !user.email_verified {
+        let code = get_totp_client(&totp_secret().to_encoded()).generate_current()?;
+        AuthFlow::VerifyEmail { code: code.clone() }
+            .store(
+                AuthFlowNamespace::VerifyEmail,
+                AuthFlowKey::UserId(user.id),
+                &global.redis,
+            )
+            .await?;
+
+        let mail = AuthEmails::VerifyEmail {
+            login: user.login,
+            code,
+        };
+
+        global.mailer.send(&user.email, mail).await?;
+        return Err(ApiError::EmailIsNotVerified);
+    }
 
     if user.password_hash.is_none() {
         Err(ApiError::InvalidLogin)?;
@@ -64,6 +89,11 @@ async fn login(
         )
         .map_err(|_| ApiError::InvalidLogin)?;
 
+    if user.totp_secret.is_some() {
+        let response = create_totp_exchange(&user, &global.redis).await?;
+        return Ok(Json(either::Right(response)));
+    }
+
     let sess = create_session("temporary".into(), &user, &global.settings)?;
 
     let mut tx = global.database.begin().await?;
@@ -76,7 +106,7 @@ async fn login(
         .send(&user.email, AuthEmails::NewLogin { login })
         .await?;
 
-    Ok(Json(models::auth::Session::from(sess.session)))
+    Ok(Json(either::Left(models::Session::from(sess.session))))
 }
 
 #[derive(Debug, serde::Deserialize, Validate)]
@@ -94,7 +124,7 @@ async fn register(
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
     Valid(Json(request)): Valid<Json<RegisterPassword>>,
-) -> HttpResult<Json<models::auth::Session>> {
+) -> HttpResult<Json<models::Session>> {
     remove_session(session, &cookies, &global).await?; // force logout
 
     if User::get_by_email(&request.email, &global.database)
@@ -127,5 +157,5 @@ async fn register(
     tx.commit().await?;
 
     cookies.add(sess.cookie);
-    Ok(Json(models::auth::Session::from(sess.session)))
+    Ok(Json(models::Session::from(sess.session)))
 }

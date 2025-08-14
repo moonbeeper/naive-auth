@@ -6,7 +6,12 @@ pub trait EmailResource {
 pub enum AuthEmails {
     OtpLoginRequest { login: String, code: String },
     OtpRegisterRequest { email: String, code: String },
+    OtpRecoverRequest { login: String, code: String },
     NewLogin { login: String },
+    TOTPAdded { login: String },
+    TOTPRecoverUsed { login: String },
+    VerifyEmail { login: String, code: String },
+    EmailVerified { login: String },
 }
 
 impl EmailResource for AuthEmails {
@@ -17,8 +22,26 @@ impl EmailResource for AuthEmails {
             | Self::OtpRegisterRequest { email: login, code } => {
                 format!("Hi there {login}\nyour verification code is {code}")
             }
+            Self::OtpRecoverRequest { login, code } => {
+                format!(
+                    "Hi there {login}, please use the following code to recover your account: {code}",
+                )
+            }
             Self::NewLogin { login } => {
                 format!("Hi there {login}, we noticed a new login to your account. thanks byeee")
+            }
+
+            Self::TOTPAdded { login } => {
+                format!("Hi there {login}, your 2FA is now enabled! *wahoo*")
+            }
+            Self::TOTPRecoverUsed { login } => {
+                format!("Hi there {login}, one of your recovery codes has been used")
+            }
+            Self::VerifyEmail { login, code } => {
+                format!("Hi there {login}, here's your email verification code: {code}")
+            }
+            Self::EmailVerified { login } => {
+                format!("Hi there {login}, your email address has been verified! *wahoooooooooo*")
             }
         }
     }
@@ -28,6 +51,11 @@ impl EmailResource for AuthEmails {
                 format!("Your OTP code: {code}")
             }
             Self::NewLogin { .. } => "New Login Detected... you might be screwed lol".to_string(),
+            Self::TOTPAdded { .. } => "New account changes".to_string(),
+            Self::OtpRecoverRequest { .. } => "Recover your account".to_string(),
+            Self::TOTPRecoverUsed { .. } => "Recovery code used".to_string(),
+            Self::VerifyEmail { .. } => "Verify your email address".to_string(),
+            Self::EmailVerified { .. } => "Your email address has been verified".to_string(),
         }
     }
 }

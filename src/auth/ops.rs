@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rand_chacha::{
     ChaCha20Rng,
     rand_core::{RngCore, SeedableRng as _},
@@ -6,17 +8,24 @@ use tower_cookies::{Cookie, Cookies};
 
 use crate::{
     auth::{middleware::AuthContext, ticket::AuthTicket},
-    database::models::{session::Session, user::User},
+    database::{
+        models::{session::Session, user::User},
+        redis::models::{
+            FlowId, RedisError,
+            auth::{AuthFlow, AuthFlowKey, AuthFlowNamespace},
+        },
+    },
     global::GlobalState,
+    http::error::ApiError,
     settings::Settings,
 };
 
 pub async fn remove_session(
-    session: AuthContext,
+    auth_context: AuthContext,
     cookie_jar: &Cookies,
-    global: &GlobalState,
+    global: &Arc<GlobalState>,
 ) -> anyhow::Result<()> {
-    match session {
+    match auth_context {
         AuthContext::Authenticated { session_id, .. } => {
             let mut tx = global.database.begin().await?;
             Session::delete(session_id, &mut tx).await?;
@@ -95,4 +104,60 @@ pub fn build_cookie(
         .domain(domain)
         .max_age(tower_cookies::cookie::time::Duration::seconds(max_age))
         .into()
+}
+
+// todo: hack. Its a copy of the HttpError with the added link_id
+// should this even be imported by the routes? i mean like there's no other way to return it otherwise
+#[derive(Debug, serde::Serialize)]
+pub struct TotpResponse<'a> {
+    pub error: &'a str,
+    pub message: String,
+    pub link_id: FlowId,
+}
+
+pub async fn create_totp_exchange(
+    user: &User,
+    redis: &fred::clients::Pool,
+) -> Result<TotpResponse<'static>, RedisError> {
+    let flow_id = FlowId::new();
+    AuthFlow::TotpExchange {
+        user_id: user.id,
+        secret: user.totp_secret.clone().unwrap(),
+    }
+    .store(
+        AuthFlowNamespace::TotpExchange,
+        AuthFlowKey::FlowId(flow_id),
+        redis,
+    )
+    .await?;
+
+    Ok(TotpResponse {
+        error: ApiError::TotpIsRequired.into(),
+        message: ApiError::TotpIsRequired.to_string(),
+        link_id: flow_id,
+    })
+}
+
+// this would give something like "1beef-birb1"
+fn generate_totp_recovery_code(secret: &str, n: usize) -> String {
+    let hash = format!("{secret}:{n}");
+
+    blake3::hash(hash.as_bytes())
+        .to_hex()
+        .chars()
+        .take(10)
+        .collect()
+}
+
+pub fn get_totp_recovery_codes(secret: &str) -> Vec<String> {
+    (0..16)
+        .map(|n| generate_totp_recovery_code(secret, n))
+        .map(|code| {
+            format!(
+                "{}-{}",
+                code.chars().take(5).collect::<String>().to_uppercase(),
+                code.chars().skip(5).collect::<String>().to_uppercase()
+            )
+        })
+        .collect()
 }

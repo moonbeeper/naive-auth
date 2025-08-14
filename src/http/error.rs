@@ -21,7 +21,9 @@ pub enum ApiError {
     #[error("User already exists")]
     UserAlreadyExists,
     #[error("Unknown error: {0}")]
-    Unknown(#[from] anyhow::Error),
+    Unknown(String),
+    #[error("Unknown error: {0}")]
+    UnknownAlt(#[from] anyhow::Error),
     #[error("Failed to send email because of: {0}")]
     EmailError(#[from] lettre::address::AddressError),
     #[error("Woops, something its wrong with Redis: {0}")]
@@ -30,6 +32,32 @@ pub enum ApiError {
     SystemTimeError(#[from] std::time::SystemTimeError),
     #[error("Seems like {0} is not really a valid OTP code")]
     InvalidOTPCode(String),
+    #[error("Seems like {0} is not really a valid TOTP code")] // its just a copy of the otp err
+    InvalidTOTPCode(String),
+    #[error("2FA is enabled for this account")]
+    TotpIsRequired,
+    #[error("hi there, I am a teapot")]
+    Teapot,
+    #[error("2FA is already enabled on your account!")]
+    TotpIsAlreadyEnabled,
+    #[error("To do this you need to be logged in")]
+    YouAreNotLoggedIn,
+    #[error("The recovery code you provided is not valid: {0}")]
+    InvalidRecoveryCode(String),
+    #[error("You already used this recovery code: {0}")]
+    UsedRecoveryCode(String),
+    #[error("You need to enable 2FA first before you can disable it")]
+    TotpIsNotEnabled,
+    #[error("Seems like the OTP recovery flow has expired or is invalid. Please retry again")]
+    OTPRecoveryFlowNotFound,
+    #[error("The TOTP flow wasn't found. Are you sure you invoked it?")]
+    TotpFlowNotFound,
+    #[error("Your email seems to not be verified. Check your inbox for the code!")]
+    EmailIsNotVerified,
+    #[error("Your email is already verified")]
+    EmailIsAlreadyVerified,
+    #[error("The email verification code you provided is invalid")]
+    InvalidEmailVerification,
 }
 
 impl ApiError {
@@ -41,11 +69,24 @@ impl ApiError {
             Self::InvalidLogin => axum::http::StatusCode::UNAUTHORIZED,
             Self::PasswordHashing(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Self::UserAlreadyExists => axum::http::StatusCode::BAD_REQUEST,
-            Self::Unknown(_) => axum::http::StatusCode::IM_A_TEAPOT,
+            Self::UnknownAlt(_) | Self::Unknown(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Self::EmailError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Self::RedisError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Self::SystemTimeError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Self::InvalidOTPCode(_) => axum::http::StatusCode::BAD_REQUEST,
+            Self::InvalidTOTPCode(_) => axum::http::StatusCode::BAD_REQUEST,
+            Self::TotpIsRequired => axum::http::StatusCode::UNAUTHORIZED,
+            Self::Teapot => axum::http::StatusCode::IM_A_TEAPOT,
+            Self::TotpIsAlreadyEnabled => axum::http::StatusCode::BAD_REQUEST,
+            Self::YouAreNotLoggedIn => axum::http::StatusCode::UNAUTHORIZED,
+            Self::InvalidRecoveryCode(_) => axum::http::StatusCode::BAD_REQUEST,
+            Self::UsedRecoveryCode(_) => axum::http::StatusCode::BAD_REQUEST,
+            Self::TotpIsNotEnabled => axum::http::StatusCode::BAD_REQUEST,
+            Self::OTPRecoveryFlowNotFound => axum::http::StatusCode::NOT_FOUND,
+            Self::TotpFlowNotFound => axum::http::StatusCode::NOT_FOUND,
+            Self::EmailIsNotVerified => axum::http::StatusCode::UNAUTHORIZED,
+            Self::EmailIsAlreadyVerified => axum::http::StatusCode::BAD_REQUEST,
+            Self::InvalidEmailVerification => axum::http::StatusCode::BAD_REQUEST,
         }
     }
 }
