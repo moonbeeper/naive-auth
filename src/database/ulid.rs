@@ -5,8 +5,9 @@ use sqlx::{
     error::BoxDynError,
     postgres::{PgArgumentBuffer, PgHasArrayType, PgTypeInfo, PgValueRef},
 };
+use validator::ValidateLength;
 
-#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub struct Ulid(pub ulid::Ulid);
 
 impl Default for Ulid {
@@ -85,5 +86,11 @@ impl FromStr for Ulid {
 impl Display for Ulid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl ValidateLength<u64> for Ulid {
+    fn length(&self) -> Option<u64> {
+        Some(self.0.to_string().len() as u64)
     }
 }

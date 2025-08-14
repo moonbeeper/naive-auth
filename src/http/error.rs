@@ -1,5 +1,7 @@
 use axum::{Json, response::IntoResponse};
 
+use crate::database::redis::models::RedisError;
+
 #[derive(Debug, serde::Serialize)]
 struct HttpError<'a> {
     pub error: &'a str,
@@ -22,6 +24,12 @@ pub enum ApiError {
     Unknown(#[from] anyhow::Error),
     #[error("Failed to send email because of: {0}")]
     EmailError(#[from] lettre::address::AddressError),
+    #[error("Woops, something its wrong with Redis: {0}")]
+    RedisError(#[from] RedisError),
+    #[error("We think we broke time. {0}")]
+    SystemTimeError(#[from] std::time::SystemTimeError),
+    #[error("Seems like {0} is not really a valid OTP code")]
+    InvalidOTPCode(String),
 }
 
 impl ApiError {
@@ -35,6 +43,9 @@ impl ApiError {
             Self::UserAlreadyExists => axum::http::StatusCode::BAD_REQUEST,
             Self::Unknown(_) => axum::http::StatusCode::IM_A_TEAPOT,
             Self::EmailError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            Self::RedisError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            Self::SystemTimeError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            Self::InvalidOTPCode(_) => axum::http::StatusCode::BAD_REQUEST,
         }
     }
 }

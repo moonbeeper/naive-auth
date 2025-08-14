@@ -3,6 +3,7 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 use crate::settings::DatabaseSettings;
 
 pub mod models;
+pub mod redis;
 pub mod ulid;
 
 type DatabaseError<T> = Result<T, sqlx::Error>;

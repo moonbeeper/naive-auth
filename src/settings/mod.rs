@@ -2,6 +2,8 @@ use std::{fs::File, io::Write, net::SocketAddr, path::Path};
 
 use smart_default::SmartDefault;
 
+pub mod cli;
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]
 pub struct HttpSettings {
     #[default(SocketAddr::from(([127, 0, 0, 1], 8080)))]
@@ -48,21 +50,41 @@ pub struct EmailSettings {
     pub user: String,
     #[default("example.com")]
     pub domain: String,
-    pub server: EmailServer,
+    pub smtp: EmailServer,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]
 pub struct EmailServer {
     #[default("any")]
-    pub smtp_username: String,
+    pub username: String,
     #[default("any")]
-    pub smtp_password: String,
+    pub password: String,
     #[default("localhost")]
-    pub smtp_host: String,
+    pub host: String,
     #[default(1025)]
-    pub smtp_port: u16,
+    pub port: u16,
     #[default(false)]
-    pub smtp_tls: bool,
+    pub tls: bool,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug, SmartDefault)]
+pub struct RedisSettings {
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub database: Option<u8>,
+    #[default(SocketAddr::from(([127, 0, 0, 1], 6379)))]
+    pub server: SocketAddr,
+    #[default(16)]
+    pub max_connections: usize,
+}
+
+// should probably merge the jwt secret too.
+#[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug, SmartDefault)]
+pub struct AuthSecrets {
+    #[default("CHANGE_ME_OR_ELSE_YOU_ARE_SCREWED")]
+    pub totp_secret: String,
+    #[default("CHANGE_ME_OR_ELSE_YOU_ARE_SCREWED")]
+    pub otp_secret: String,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
@@ -71,20 +93,24 @@ pub struct Settings {
     pub database: DatabaseSettings,
     pub session: SessionSettings,
     pub email: EmailSettings,
+    pub redis: RedisSettings,
+    pub secrets: AuthSecrets,
 }
 
 impl Settings {
     pub fn load() -> anyhow::Result<Self> {
         tracing::info!("Loading settings...");
-        Self::create_settings_file()?;
         // seems like configrs got overhauled. No need for figment i guess.
         let config = config::Config::builder()
-            .add_source(config::File::with_name("settings.toml").required(true))
+            .add_source(config::File::with_name("settings.toml").required(false))
             .add_source(config::Environment::with_prefix("BEEP"))
             .build()?;
 
         match config.try_deserialize::<Self>() {
-            Ok(settings) => Ok(settings),
+            Ok(settings) => {
+                tracing::info!("Settings loaded successfully!");
+                Ok(settings)
+            }
             Err(e) => {
                 tracing::error!(
                     "Failed to deserialize settings! Will be using the defaults: {:?}",
@@ -95,16 +121,16 @@ impl Settings {
         }
     }
 
-    fn create_settings_file() -> anyhow::Result<()> {
+    pub fn create_settings_file() -> anyhow::Result<()> {
         let path = Path::new("settings.toml");
         if !path.exists() {
-            tracing::warn!("Settings file does not exist. I'll create it for you :)");
+            // tracing::warn!("Settings file does not exist. I'll create it for you :)");
             let mut file = File::create(path)?;
             file.write_all(toml::to_string_pretty(&Self::default())?.as_bytes())?;
-            tracing::info!(
-                "Settings file created at {}. They will be loaded right now :)",
-                path.display()
-            );
+            // tracing::info!(
+            //     "Settings file created at {}. They will be loaded right now :)",
+            //     path.display()
+            // );
         }
 
         Ok(())

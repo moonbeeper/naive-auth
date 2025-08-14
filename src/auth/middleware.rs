@@ -13,7 +13,7 @@ use tower::Service;
 use tower_cookies::Cookies;
 
 use crate::{
-    auth::{build_cookie, ticket::AuthTicket},
+    auth::{ops::build_cookie, ticket::AuthTicket},
     database::models::{
         session::{Session, SessionId},
         user::UserId,
@@ -39,12 +39,12 @@ impl AuthContext {
         }
     }
 
-    pub const fn session_id(&self) -> Option<SessionId> {
-        match self {
-            Self::Authenticated { session_id, .. } => Some(*session_id),
-            Self::NotAuthenticated => None,
-        }
-    }
+    // pub const fn session_id(&self) -> Option<SessionId> {
+    //     match self {
+    //         Self::Authenticated { session_id, .. } => Some(*session_id),
+    //         Self::NotAuthenticated => None,
+    //     }
+    // }
 
     pub const fn is_authenticated(&self) -> bool {
         matches!(self, Self::Authenticated { .. }) // no need to use mr if statements wohoo
@@ -88,7 +88,7 @@ impl<S: Send + Sync + 'static> AuthManagerMiddleware<S> {
         let token_value = session_cookie.value().to_string();
         tracing::debug!("session cookie found");
 
-        let Ok(token) = AuthTicket::validate(&token_value, &self.global) else {
+        let Ok(token) = AuthTicket::validate(&token_value, &self.global.settings) else {
             tracing::debug!("invalid token");
             // let cookie = Cookie::build((self.global.settings.session.cookie_name.as_str(), "")).path("/");
             cookies.remove(cookie_name.into());
@@ -121,7 +121,7 @@ impl<S: Send + Sync + 'static> AuthManagerMiddleware<S> {
             session.update(&mut tx).await?;
             tx.commit().await?;
 
-            let ticket = AuthTicket::from(&session).generate(&self.global)?;
+            let ticket = AuthTicket::from(&session).generate(&self.global.settings)?;
             let cookie = build_cookie(
                 cookie_name,
                 self.global.settings.session.inactive_age,

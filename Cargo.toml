@@ -1,15 +1,19 @@
 [package]
 name = "beepauth"
+authors = ["moonbeeper <moonbeeper@duck.com>"]
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+any_ascii = "0.3.3"
 anyhow = "1.0.98"
 argon2 = { version = "0.5.3", features = ["std"] }
 axum = { version = "0.8.4", features = ["macros"] }
 axum-valid = "0.24.0"
 chrono = { version = "0.4.41", features = ["serde"] }
-config = "0.15.13"
+clap = { version = "4.5.45", features = ["derive"] }
+config = "0.15.14"
+fred = { version = "10.1.0", features = ["serde_json"] }
 futures-util = "0.3.31"
 jsonwebtoken = "9.3.1"
 lettre = { version = "0.11.18", features = ["tokio1-native-tls"] }
@@ -36,11 +40,12 @@ tokio = { version = "1.47.1", features = [
     "tracing",
 ] }
 toml = "0.9.5"
+totp-rs = { version = "5.7.0", features = ["gen_secret"] }
 tower = "0.5.2"
 tower-cookies = "0.11.0"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
-typed-builder = "0.21.0"
+typed-builder = "0.21.1"
 ulid = { version = "1.2.1", features = ["serde", "uuid"] }
 uuid = { version = "1.18.0", features = ["v4"] }
 validator = { version = "0.20.0", features = ["derive"] }

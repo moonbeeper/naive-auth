@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use lettre::{
     Address, AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
     message::{Mailbox, header::ContentType},
     transport::smtp::{
         authentication::Credentials,
-        client::{Tls, TlsParameters, TlsParametersBuilder},
+        client::{Tls, TlsParametersBuilder},
     },
 };
 
@@ -30,18 +30,18 @@ impl EmailMan {
     pub async fn new(settings: &EmailSettings) -> Self {
         tracing::info!("Starting email manager...");
         let credentials = Credentials::new(
-            settings.server.smtp_username.clone(),
-            settings.server.smtp_password.clone(),
+            settings.smtp.username.clone(),
+            settings.smtp.password.clone(),
         );
-        let mailer = AsyncSmtpTransport::<Tokio1Executor>::relay(&settings.server.smtp_host)
+        let mailer = AsyncSmtpTransport::<Tokio1Executor>::relay(&settings.smtp.host)
             .expect("Failed to build smtp transport");
 
         let mailer = mailer
             .credentials(credentials)
-            .port(settings.server.smtp_port)
-            .tls(if settings.server.smtp_tls {
+            .port(settings.smtp.port)
+            .tls(if settings.smtp.tls {
                 Tls::Wrapper(
-                    TlsParametersBuilder::new(settings.server.smtp_host.clone())
+                    TlsParametersBuilder::new(settings.smtp.host.clone())
                         .build()
                         .expect("Failed to build TLS params"),
                 )
@@ -68,15 +68,10 @@ impl EmailMan {
         }
     }
 
-    pub async fn send(
-        &self,
-        to: Mailbox,
-        email: impl resources::EmailResource,
-    ) -> anyhow::Result<()> {
+    pub async fn send(&self, to: &str, email: impl resources::EmailResource) -> anyhow::Result<()> {
+        let to = Mailbox::from_str(to)?;
         let html = email.html();
         let subject = email.subject();
-
-        tracing::info!("Sending email lol");
 
         let email: Message = Message::builder()
             .from(Mailbox::new(

@@ -1,18 +1,20 @@
-use std::{str::FromStr as _, sync::Arc};
+use std::sync::Arc;
 
 use argon2::{
     Argon2, PasswordHash, PasswordHasher as _, PasswordVerifier as _, password_hash::SaltString,
 };
 use axum::{Extension, Json, Router, extract::State, routing::post};
 use axum_valid::Valid;
-use lettre::message::Mailbox;
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
 use validator::Validate;
 
 use crate::{
-    auth::{self, middleware::AuthContext, ops::remove_session, ticket::AuthTicket},
-    database::models::{session::Session, user::User},
+    auth::{
+        middleware::AuthContext,
+        ops::{create_session, remove_session},
+    },
+    database::models::user::User,
     email::resources::AuthEmails,
     global::GlobalState,
     http::{HttpResult, error::ApiError, v1::models},
@@ -36,29 +38,19 @@ async fn login(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
-    Json(request): Json<LoginPassword>,
+    Valid(Json(request)): Valid<Json<LoginPassword>>,
 ) -> HttpResult<Json<models::auth::Session>> {
     remove_session(session, &cookies, &global).await?; // force logout
+    let login = any_ascii::any_ascii(&request.login_or_email);
 
-    let user =
-        if let Some(user) = User::get_by_login(&request.login_or_email, &global.database).await? {
-            user
-        } else {
-            let user = User::get_by_email(&request.login_or_email, &global.database).await?;
-            if user.is_none() {
-                return Err(ApiError::InvalidLogin);
-            }
-            user.unwrap()
-        };
-
-    // todo: user email man to send the typical email alerts and verification before allowing login. (redis)
-    global
-        .mailer
-        .send(
-            Mailbox::from_str(&user.email.unwrap())?,
-            AuthEmails::TestEmail,
-        )
-        .await?;
+    let user = if let Some(user) = User::get_by_login(&login, &global.database).await? {
+        user
+    } else if let Some(user) = User::get_by_email(&request.login_or_email, &global.database).await?
+    {
+        user
+    } else {
+        return Err(ApiError::InvalidLogin);
+    };
 
     if user.password_hash.is_none() {
         Err(ApiError::InvalidLogin)?;
@@ -72,31 +64,19 @@ async fn login(
         )
         .map_err(|_| ApiError::InvalidLogin)?;
 
-    let session = Session::builder()
-        .user_id(user.id)
-        .name("temporary".into())
-        .active_expires_at(
-            chrono::Utc::now() + chrono::Duration::seconds(global.settings.session.active_age),
-        )
-        .inactive_expires_at(
-            chrono::Utc::now() + chrono::Duration::seconds(global.settings.session.inactive_age),
-        )
-        .build();
+    let sess = create_session("temporary".into(), &user, &global.settings)?;
 
     let mut tx = global.database.begin().await?;
-    session.insert(&mut tx).await?;
+    sess.session.insert(&mut tx).await?;
     tx.commit().await?;
 
-    let ticket = AuthTicket::from(&session).generate(&global)?;
-    let cookie = auth::build_cookie(
-        global.settings.session.cookie_name.clone(),
-        global.settings.session.inactive_age,
-        global.settings.http.domain.clone(),
-        ticket,
-    );
-    cookies.add(cookie);
+    cookies.add(sess.cookie);
+    global
+        .mailer
+        .send(&user.email, AuthEmails::NewLogin { login })
+        .await?;
 
-    Ok(Json(models::auth::Session::from(session)))
+    Ok(Json(models::auth::Session::from(sess.session)))
 }
 
 #[derive(Debug, serde::Deserialize, Validate)]
@@ -124,6 +104,8 @@ async fn register(
         return Err(ApiError::UserAlreadyExists);
     }
 
+    let login = any_ascii::any_ascii(&request.login);
+
     let argon2 = Argon2::default();
     let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());
     let password_hash = argon2
@@ -131,36 +113,19 @@ async fn register(
         .to_string();
 
     let user = User::builder()
-        .login(request.login.clone())
+        .login(login)
         .email(request.email.clone())
         .email_verified(false)
         .password_hash(password_hash)
         .build();
 
-    let session = Session::builder()
-        .user_id(user.id)
-        .name("temporary".into())
-        .active_expires_at(
-            chrono::Utc::now() + chrono::Duration::seconds(global.settings.session.active_age),
-        )
-        .inactive_expires_at(
-            chrono::Utc::now() + chrono::Duration::seconds(global.settings.session.inactive_age),
-        )
-        .build();
+    let sess = create_session("temporary".into(), &user, &global.settings)?;
 
     let mut tx = global.database.begin().await?;
     user.insert(&mut tx).await?;
-    session.insert(&mut tx).await?;
+    sess.session.insert(&mut tx).await?;
     tx.commit().await?;
 
-    let ticket = AuthTicket::from(&session).generate(&global)?;
-    let cookie = auth::build_cookie(
-        global.settings.session.cookie_name.clone(),
-        global.settings.session.inactive_age,
-        global.settings.http.domain.clone(),
-        ticket,
-    );
-    cookies.add(cookie);
-
-    Ok(Json(models::auth::Session::from(session)))
+    cookies.add(sess.cookie);
+    Ok(Json(models::auth::Session::from(sess.session)))
 }

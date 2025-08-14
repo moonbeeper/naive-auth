@@ -15,15 +15,16 @@ use crate::global::GlobalState;
 
 mod auth;
 mod database;
+mod email;
 mod global;
 mod http;
 mod settings;
-mod email;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt().init();
     tracing::info!("heelo");
+    settings::cli::run().expect("Failed to run settings CLI");
     let settings = settings::Settings::load().expect("Failed to load settings");
     // let app = Router::new().route("/", get(|| async { "Hello, World!" }));
 

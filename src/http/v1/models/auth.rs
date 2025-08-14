@@ -11,6 +11,7 @@ pub struct Session {
 
 impl From<database::models::session::Session> for Session {
     fn from(value: database::models::session::Session) -> Self {
+        println!("value: {value:?}");
         Self {
             id: value.id,
             name: value.name,
@@ -20,4 +21,3 @@ impl From<database::models::session::Session> for Session {
         }
     }
 }
-

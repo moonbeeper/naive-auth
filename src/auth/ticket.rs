@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::anyhow;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 
@@ -8,7 +6,7 @@ use crate::{
         session::{Session, SessionId},
         user::UserId,
     },
-    global::GlobalState,
+    settings::Settings,
 };
 
 #[derive(Debug)]
@@ -42,43 +40,40 @@ struct Claims {
 }
 
 impl AuthTicket {
-    pub fn generate(&self, global: &Arc<GlobalState>) -> anyhow::Result<String> {
+    pub fn generate(&self, settings: &Settings) -> anyhow::Result<String> {
         let claims = Claims {
             sub: self.user_id.to_string(),
             iat: self.issued_at.timestamp(),
             nbf: self.issued_at.timestamp(),
             exp: self.expiration.timestamp(),
-            iss: global
-                .settings
+            iss: settings
                 .session
                 .jwt
                 .issuer
                 .clone()
-                .unwrap_or_else(|| global.settings.http.origin.clone()),
+                .unwrap_or_else(|| settings.http.origin.clone()),
             jti: self.session_id.to_string(),
         };
 
-        let key = EncodingKey::from_secret(global.settings.session.jwt.secret.as_bytes());
+        let key = EncodingKey::from_secret(settings.session.jwt.secret.as_bytes());
         Ok(encode(&Header::new(Algorithm::HS256), &claims, &key)?)
     }
 
-    pub fn validate(token: &str, global: &Arc<GlobalState>) -> anyhow::Result<Self> {
-        let decoding_key = DecodingKey::from_secret(global.settings.session.jwt.secret.as_bytes());
+    pub fn validate(token: &str, settings: &Settings) -> anyhow::Result<Self> {
+        let decoding_key = DecodingKey::from_secret(settings.session.jwt.secret.as_bytes());
 
         let mut validation = Validation::new(Algorithm::HS256);
-        validation.set_issuer(&[global
-            .settings
+        validation.set_issuer(&[settings
             .session
             .jwt
             .issuer
             .clone()
-            .unwrap_or_else(|| global.settings.http.origin.clone())]);
+            .unwrap_or_else(|| settings.http.origin.clone())]);
 
         let token_data = decode::<Claims>(token, &decoding_key, &validation)?;
         let claims = token_data.claims;
 
         let user_id = claims.sub.parse()?;
-
         let session_id = claims.jti.parse()?;
 
         Ok(Self {

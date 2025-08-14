@@ -9,12 +9,14 @@ use crate::{
     http::{HttpResult, error::ApiError, v1::models},
 };
 
+mod otp;
 mod password;
 
 pub fn routes() -> Router<Arc<GlobalState>> {
     Router::new()
         .route("/", get(index))
         .merge(password::routes())
+        .nest("/otp", otp::routes())
         .route("/current", get(current_session))
         .route("/sessions", get(list_sessions))
 }

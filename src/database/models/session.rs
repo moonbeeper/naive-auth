@@ -13,9 +13,9 @@ pub struct Session {
     pub name: String,
     pub active_expires_at: chrono::DateTime<chrono::Utc>,
     pub inactive_expires_at: chrono::DateTime<chrono::Utc>,
-    #[builder(default)]
+    // omg the builder default messes somehow with the fields when fetching from the database, making it return the
+    // default value instead of the actual value.
     pub updated_at: chrono::DateTime<chrono::Utc>,
-    #[builder(default)]
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -44,14 +44,14 @@ impl Session {
     where
         E: PgExecutor<'a>,
     {
-        let user = sqlx::query_as!(
+        let session = sqlx::query_as!(
             Session,
             "select * from sessions where id = $1",
             id as SessionId
         )
         .fetch_optional(executor)
         .await?;
-        Ok(user)
+        Ok(session)
     }
 
     pub async fn update(&self, transaction: &mut PgTransaction<'_>) -> DatabaseError<()> {
@@ -97,13 +97,16 @@ impl Session {
     where
         E: PgExecutor<'a>,
     {
+        // why does the update and created at fields just return the default time!?
         let sessions = sqlx::query_as!(
             Session,
-            "select * from sessions where user_id = $1 order by created_at desc limit 100",
+            "select id, user_id, name, active_expires_at, inactive_expires_at, created_at, updated_at from sessions where user_id = $1 order by created_at desc limit 100",
             id as UserId
         )
         .fetch_all(executor)
         .await?;
+
+        println!("sessions: {sessions:?}");
 
         Ok(sessions)
     }

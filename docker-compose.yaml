@@ -9,6 +9,16 @@ services:
       POSTGRES_USER: beep
       POSTGRES_PASSWORD: beep
       POSTGRES_DB: beep_auth
+  valkey:
+    image: docker.io/bitnami/valkey:8.1
+    environment:
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+      - VALKEY_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    ports:
+      - '6379:6379'
+    volumes:
+      - 'valkey-data:/bitnami/valkey/data'
   mailpit:
     image: axllent/mailpit
     ports:
@@ -24,3 +34,4 @@ services:
 volumes:
   db-data:
   mailpit-data:
+  valkey-data:

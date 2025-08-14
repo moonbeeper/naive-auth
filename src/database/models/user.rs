@@ -12,11 +12,10 @@ pub struct User {
     pub login: String,
     #[builder(default, setter(strip_option))]
     pub display_name: Option<String>,
-    #[builder(setter(strip_option))]
-    pub email: Option<String>,
+    pub email: String,
     #[builder(default)]
     pub email_verified: bool,
-    #[builder(setter(strip_option))]
+    #[builder(default, setter(strip_option))]
     pub password_hash: Option<String>,
     #[builder(default)]
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -74,5 +73,22 @@ impl User {
             .fetch_optional(executor)
             .await?;
         Ok(user)
+    }
+
+    pub async fn get_login_by_email<'a, E>(email: &str, executor: E) -> DatabaseError<String>
+    where
+        E: PgExecutor<'a> + Copy,
+    {
+        let prefix = email.split('@').next().unwrap_or("user");
+        let parsed = any_ascii::any_ascii(prefix);
+
+        let mut login = parsed.clone();
+        let mut counter = 0;
+        while Self::get_by_email(email, executor).await?.is_some() {
+            counter += 1;
+            login = format!("{parsed}_{counter}");
+        }
+
+        Ok(login)
     }
 }
