@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, Router, extract::State, routing::get};
+use axum::{Extension, Json, Router, extract::State, response::IntoResponse, routing::get};
 use tower_cookies::Cookies;
 
 use crate::{
@@ -34,4 +34,29 @@ async fn get_user(
     };
 
     Ok(Json(models::User::from(user)))
+}
+
+// I don't know where to put this lol
+struct JsonEither<L, R>(either::Either<Json<L>, Json<R>>);
+
+impl<L, R> IntoResponse for JsonEither<L, R>
+where
+    Json<L>: IntoResponse,
+    Json<R>: IntoResponse,
+{
+    fn into_response(self) -> axum::response::Response {
+        match self.0 {
+            either::Either::Left(data) => data.into_response(),
+            either::Either::Right(data) => data.into_response(),
+        }
+    }
+}
+
+impl<L, R> JsonEither<L, R> {
+    pub const fn left(data: L) -> Self {
+        Self(either::Either::Left(Json(data)))
+    }
+    pub const fn right(data: R) -> Self {
+        Self(either::Either::Right(Json(data)))
+    }
 }

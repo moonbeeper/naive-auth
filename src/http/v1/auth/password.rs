@@ -23,7 +23,11 @@ use crate::{
     },
     email::resources::AuthEmails,
     global::GlobalState,
-    http::{HttpResult, error::ApiError, v1::models},
+    http::{
+        HttpResult,
+        error::ApiError,
+        v1::{JsonEither, models},
+    },
 };
 
 pub fn routes() -> Router<Arc<GlobalState>> {
@@ -45,7 +49,7 @@ async fn login(
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
     Valid(Json(request)): Valid<Json<LoginPassword>>,
-) -> HttpResult<Json<either::Either<models::Session, TotpResponse<'static>>>> {
+) -> HttpResult<JsonEither<models::Session, TotpResponse<'static>>> {
     remove_session(session, &cookies, &global).await?; // force logout
     let login = any_ascii::any_ascii(&request.login_or_email);
 
@@ -91,7 +95,7 @@ async fn login(
 
     if user.totp_secret.is_some() {
         let response = create_totp_exchange(&user, &global.redis).await?;
-        return Ok(Json(either::Right(response)));
+        return Ok(JsonEither::right(response));
     }
 
     let sess = create_session("temporary".into(), &user, &global.settings)?;
@@ -106,7 +110,7 @@ async fn login(
         .send(&user.email, AuthEmails::NewLogin { login })
         .await?;
 
-    Ok(Json(either::Left(models::Session::from(sess.session))))
+    Ok(JsonEither::left(models::Session::from(sess.session)))
 }
 
 #[derive(Debug, serde::Deserialize, Validate)]

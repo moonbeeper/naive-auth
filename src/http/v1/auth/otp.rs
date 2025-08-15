@@ -22,7 +22,11 @@ use crate::{
     },
     email::resources::AuthEmails,
     global::GlobalState,
-    http::{HttpResult, error::ApiError, v1::models},
+    http::{
+        HttpResult,
+        error::ApiError,
+        v1::{JsonEither, models},
+    },
 };
 
 pub fn routes() -> Router<Arc<GlobalState>> {
@@ -153,7 +157,7 @@ async fn exchange(
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
     Valid(Json(request)): Valid<Json<AuthExchange>>,
-) -> HttpResult<Json<either::Either<models::Session, TotpResponse<'static>>>> {
+) -> HttpResult<JsonEither<models::Session, TotpResponse<'static>>> {
     remove_session(session, &cookies, &global).await?; // force logout
 
     if request.code.trim().is_empty() {
@@ -192,7 +196,7 @@ async fn exchange(
 
         if user.totp_secret.is_some() {
             let response = create_totp_exchange(&user, &global.redis).await?;
-            return Ok(Json(either::Right(response)));
+            return Ok(JsonEither::right(response));
         }
 
         let sess = create_session("temporary".into(), &user, &global.settings)?;
@@ -207,7 +211,7 @@ async fn exchange(
             .send(&user.email, AuthEmails::NewLogin { login: user.login })
             .await?;
 
-        return Ok(Json(either::Left(models::Session::from(sess.session))));
+        return Ok(JsonEither::left(models::Session::from(sess.session)));
     } else if let Some(AuthFlow::OtpRegisterRequest { secret }) = flow {
         if (User::get_by_email(&request.email, &global.database).await?).is_some() {
             return Err(ApiError::InvalidLogin);
@@ -248,7 +252,7 @@ async fn exchange(
             .send(&user.email, AuthEmails::NewLogin { login: user.login })
             .await?;
 
-        return Ok(Json(either::Left(models::Session::from(sess.session))));
+        return Ok(JsonEither::left(models::Session::from(sess.session)));
     }
 
     Err(ApiError::InvalidLogin)
