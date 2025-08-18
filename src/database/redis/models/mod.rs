@@ -3,6 +3,7 @@ use fred::{prelude::KeysInterface, types::Expiration};
 use crate::database::ulid::Ulid;
 
 pub mod auth;
+pub mod oauth;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RedisError {

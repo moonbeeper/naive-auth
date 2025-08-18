@@ -87,7 +87,7 @@ impl AuthFlow {
         key: AuthFlowKey,
         redis: &fred::clients::Pool,
     ) -> Result<(), RedisError> {
-        let key = format!("{}:{}", namespace.namespace(), key);
+        let key = format!("{}:{key}", namespace.namespace());
         self.insert_into_redis(&key, self.duration(), redis).await
     }
 
@@ -96,7 +96,7 @@ impl AuthFlow {
         key: AuthFlowKey,
         redis: &fred::clients::Pool,
     ) -> Result<Option<Self>, RedisError> {
-        let key = format!("{}:{}", namespace.namespace(), key);
+        let key = format!("{}:{key}", namespace.namespace());
         Self::get_from_redis(&key, redis).await
     }
 
@@ -105,7 +105,7 @@ impl AuthFlow {
         key: AuthFlowKey,
         redis: &fred::clients::Pool,
     ) -> Result<(), RedisError> {
-        let key = format!("{}:{}", namespace.namespace(), key);
+        let key = format!("{}:{key}", namespace.namespace());
         Self::del_from_redis(&key, redis).await
     }
 }

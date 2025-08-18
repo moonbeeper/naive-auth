@@ -7,9 +7,12 @@ use rand_chacha::{
 use tower_cookies::{Cookie, Cookies};
 
 use crate::{
-    auth::{middleware::AuthContext, ticket::AuthTicket},
+    auth::{self, middleware::AuthContext, oauth::middleware::OauthContext, ticket::AuthTicket},
     database::{
-        models::{session::Session, user::User},
+        models::{
+            session::Session,
+            user::{User, UserId},
+        },
         redis::models::{
             FlowId, RedisError,
             auth::{AuthFlow, AuthFlowKey, AuthFlowNamespace},
@@ -160,4 +163,12 @@ pub fn get_totp_recovery_codes(secret: &str) -> Vec<String> {
             )
         })
         .collect()
+}
+
+pub fn get_user_id(auth_context: &AuthContext, oauth_context: &OauthContext) -> UserId {
+    if oauth_context.is_some() {
+        oauth_context.user_id()
+    } else {
+        auth_context.user_id()
+    }
 }

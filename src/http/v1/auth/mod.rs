@@ -20,6 +20,7 @@ use crate::{
     http::{HttpResult, error::ApiError, v1::models},
 };
 
+mod oauth;
 mod otp;
 mod password;
 mod totp;
@@ -34,6 +35,8 @@ pub fn routes() -> Router<Arc<GlobalState>> {
         .route("/sessions", get(list_sessions))
         .route("/verify", post(verify_email))
         .route("/recovery-options", get(get_recovery_options))
+        .route("/signout", post(signout))
+        .nest("/oauth", oauth::routes())
 }
 
 async fn index() -> &'static str {
@@ -159,4 +162,17 @@ async fn get_recovery_options(
     };
 
     Ok(Json(options))
+}
+
+async fn signout(
+    State(global): State<Arc<GlobalState>>,
+    cookies: Cookies,
+    Extension(auth_context): Extension<AuthContext>,
+) -> HttpResult<()> {
+    if !auth_context.is_authenticated() {
+        return Err(ApiError::YouAreNotLoggedIn);
+    }
+
+    remove_session(auth_context, &cookies, &global).await?; // love this method
+    Ok(())
 }

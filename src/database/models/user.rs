@@ -34,9 +34,20 @@ impl User {
         sqlx::query!(
             "
             insert into
-                users (id, login, display_name, email, email_verified, password_hash, totp_secret, totp_recovery_secret, totp_recovery_codes)
-            values
-                ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                users (
+                    id,
+                    login,
+                    display_name,
+                    email,
+                    email_verified,
+                    password_hash,
+                    totp_secret,
+                    totp_recovery_secret,
+                    totp_recovery_codes,
+                    updated_at,
+                    created_at
+                )
+            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now())
             ",
             self.id as UserId,
             self.login,

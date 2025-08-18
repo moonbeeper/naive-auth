@@ -1,6 +1,6 @@
 use axum::{Json, response::IntoResponse};
 
-use crate::database::redis::models::RedisError;
+use crate::{auth::oauth::OauthErrorKind, database::redis::models::RedisError};
 
 #[derive(Debug, serde::Serialize)]
 struct HttpError<'a> {
@@ -58,11 +58,25 @@ pub enum ApiError {
     EmailIsAlreadyVerified,
     #[error("The email verification code you provided is invalid")]
     InvalidEmailVerification,
+    #[error("The method you are trying to use isn't really working out. Try again later")]
+    InvalidAuthentication,
+    #[error(
+        "Sadly we failed to parse the scopes. It might be malformed or contain invalid values: {0}"
+    )]
+    FailedParsingScopes(#[from] bitflags::parser::ParseError), // TODO: fix error
+    #[error("The OAuth application with ID {0} was not found")]
+    OAuthAppNotFound(String),
+    #[error("You are not the owner of the OAuth application with ID {0}")]
+    OAuthAppNotOwned(String),
+    #[error("You cannot create or update an OAuth application with no scopes")]
+    OAuthAppEmptyScopes,
+    #[error("The OAuth authorization with ID {0} was not found")]
+    OAuthAuthorizationNotFound(String),
 }
 
 impl ApiError {
     #[allow(clippy::match_same_arms)]
-    const fn status_code(&self) -> axum::http::StatusCode {
+    pub const fn status_code(&self) -> axum::http::StatusCode {
         match self {
             Self::Database(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             // ApiError::Test => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -87,6 +101,12 @@ impl ApiError {
             Self::EmailIsNotVerified => axum::http::StatusCode::UNAUTHORIZED,
             Self::EmailIsAlreadyVerified => axum::http::StatusCode::BAD_REQUEST,
             Self::InvalidEmailVerification => axum::http::StatusCode::BAD_REQUEST,
+            Self::InvalidAuthentication => axum::http::StatusCode::UNAUTHORIZED,
+            Self::FailedParsingScopes(_) => axum::http::StatusCode::BAD_REQUEST,
+            Self::OAuthAppNotFound(_) => axum::http::StatusCode::NOT_FOUND,
+            Self::OAuthAppNotOwned(_) => axum::http::StatusCode::BAD_REQUEST,
+            Self::OAuthAppEmptyScopes => axum::http::StatusCode::BAD_REQUEST,
+            Self::OAuthAuthorizationNotFound(_) => axum::http::StatusCode::NOT_FOUND,
         }
     }
 }

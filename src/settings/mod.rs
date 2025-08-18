@@ -67,7 +67,7 @@ pub struct EmailServer {
     pub tls: bool,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug, SmartDefault)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, SmartDefault)]
 pub struct RedisSettings {
     pub username: Option<String>,
     pub password: Option<String>,
@@ -78,13 +78,19 @@ pub struct RedisSettings {
     pub max_connections: usize,
 }
 
-// should probably merge the jwt secret too.
-#[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug, SmartDefault)]
-pub struct AuthSecrets {
-    #[default("CHANGE_ME_OR_ELSE_YOU_ARE_SCREWED")]
-    pub totp_secret: String,
-    #[default("CHANGE_ME_OR_ELSE_YOU_ARE_SCREWED")]
-    pub otp_secret: String,
+// // should probably merge the jwt secret too.
+// #[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug, SmartDefault)]
+// pub struct AuthSecrets {
+//     #[default("CHANGE_ME_OR_ELSE_YOU_ARE_SCREWED")]
+//     pub totp_secret: String,
+//     #[default("CHANGE_ME_OR_ELSE_YOU_ARE_SCREWED")]
+//     pub otp_secret: String,
+// }
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, SmartDefault)]
+pub struct OauthSettings {
+    #[default("bo")]
+    pub token_prefix: String,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
@@ -94,7 +100,8 @@ pub struct Settings {
     pub session: SessionSettings,
     pub email: EmailSettings,
     pub redis: RedisSettings,
-    pub secrets: AuthSecrets,
+    // pub secrets: AuthSecrets,
+    pub oauth: OauthSettings,
 }
 
 impl Settings {

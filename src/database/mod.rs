@@ -5,6 +5,7 @@ use crate::settings::DatabaseSettings;
 pub mod models;
 pub mod redis;
 pub mod ulid;
+pub mod string_id;
 
 type DatabaseError<T> = Result<T, sqlx::Error>;
 

@@ -5,7 +5,10 @@ use tokio::{net::TcpSocket, sync::oneshot};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 
-use crate::{auth::middleware::AuthManagerLayer, global::GlobalState};
+use crate::{
+    auth::{middleware::AuthManagerLayer, oauth::middleware::OauthManagerLayer},
+    global::GlobalState,
+};
 
 pub mod error;
 mod v1;
@@ -19,7 +22,8 @@ fn routes(global: &Arc<GlobalState>) -> Router {
         .layer(
             ServiceBuilder::new()
                 .layer(CookieManagerLayer::new())
-                .layer(AuthManagerLayer::new(global.clone())),
+                .layer(AuthManagerLayer::new(global.clone()))
+                .layer(OauthManagerLayer::new(global.clone())),
         )
         .with_state(global.clone())
 }
