@@ -8,7 +8,7 @@ use tower_cookies::{Cookie, Cookies};
 use utoipa::ToSchema;
 
 use crate::{
-    auth::{self, middleware::AuthContext, oauth::middleware::OauthContext, ticket::AuthTicket},
+    auth::{middleware::AuthContext, oauth::middleware::OauthContext, ticket::AuthTicket},
     database::{
         models::{
             session::Session,

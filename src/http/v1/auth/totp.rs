@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, Router, extract::State, routing::post};
+use axum::{Extension, Json, extract::State};
 use axum_valid::Valid;
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
-use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use validator::Validate;
 
 use crate::{
@@ -26,8 +26,6 @@ use crate::{
     http::{HttpResult, error::ApiError, v1::models},
 };
 
-use utoipa_axum::routes;
-
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
         .routes(routes!(exchange))
@@ -45,6 +43,7 @@ pub struct Exchange {
     code: String,
 }
 
+/// Exchange a Link ID to finalize a TOTP request
 #[utoipa::path(
     post,
     path = "/exchange",
@@ -121,6 +120,7 @@ pub struct EnableResponse {
     recovery_codes: Vec<String>,
 }
 
+/// The first step to enable TOTP for an account
 #[utoipa::path(
     post,
     path = "/enable",
@@ -195,6 +195,8 @@ pub struct EnableExchange {
     #[validate(length(equal = 6))]
     code: String,
 }
+
+/// The final step to enable TOTP for an account
 #[utoipa::path(
     post,
     path = "/enable/exchange",
@@ -281,6 +283,7 @@ pub struct RecoverAccount {
     recovery_code: String,
 }
 
+/// Recover an account via its TOTP recovery codes if the user has TOTP enabled
 #[utoipa::path(
     post,
     path = "/recovery",
@@ -345,6 +348,7 @@ pub struct Disable {
     code: String,
 }
 
+/// Disable TOTP from this account
 #[utoipa::path(
     post,
     path = "/disable",

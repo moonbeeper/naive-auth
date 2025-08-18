@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use axum::{Router, routing::get};
+use axum::routing::get;
 use tokio::{net::TcpSocket, sync::oneshot};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use utoipa::{
     OpenApi,
     openapi::{
-        extensions::Extensions,
+        Components,
         security::{ApiKey, ApiKeyValue, Http, HttpAuthScheme, SecurityScheme},
     },
 };
@@ -15,17 +15,8 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    auth::{middleware::AuthManagerLayer, oauth::middleware::OauthManagerLayer, ops::TotpResponse},
+    auth::{middleware::AuthManagerLayer, oauth::middleware::OauthManagerLayer},
     global::GlobalState,
-    http::v1::{
-        JsonEither,
-        auth::{
-            RecoveryOptions, VerifyEmail, oauth,
-            otp::{self, AuthResponse},
-            totp,
-        },
-        models,
-    },
 };
 
 pub mod error;
@@ -36,15 +27,17 @@ pub type HttpResult<T> = Result<T, error::ApiError>;
 #[derive(OpenApi)]
 #[openapi(
     security(
-        ("bearerAuth" = []),
-        ("cookieAuth" = [])
+        ("Bearer Auth (OAuth2 Access Token)" = []),
+        ("Cookie Auth (Session JWT)" = [])
     ),
     modifiers(&WhyUtoipa),
     tags(
-        (name = "auth", description = "Authentication endpoints"),
+        (name = "auth", description = "General authentication endpoints"),
         (name = "oauth", description = "OAuth2 endpoints"),
         (name = "totp", description = "TOTP endpoints"),
-        (name = "general", description = "Typical or useful endpoints"),
+        (name = "password", description = "Password Authentication endpoints"),
+        (name = "otp", description = "One-Time Passcode Authentication endpoints"),
+        (name = "default", description = "Uncategorized"),
     )
 )]
 pub struct ApiDoc;
@@ -93,19 +86,25 @@ struct WhyUtoipa;
 impl utoipa::Modify for WhyUtoipa {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         if openapi.components.is_none() {
-            openapi.components = Some(Default::default());
+            openapi.components = Some(Components::default());
         }
 
         let components = openapi.components.as_mut().unwrap();
 
-        let mut aaaa = Http::new(HttpAuthScheme::Bearer);
-        aaaa.bearer_format = Some("JWT".to_string());
-        aaaa.description = Some("Bearer token used for OAuth2".to_string());
+        let mut oauth = Http::new(HttpAuthScheme::Bearer);
+        oauth.bearer_format = Some("JWT".to_string());
+        oauth.description = Some("Bearer token used for OAuth2".to_string());
 
-        components.add_security_scheme("bearerAuth", SecurityScheme::Http(aaaa));
+        components.add_security_scheme(
+            "Bearer Auth (OAuth2 Access Token)",
+            SecurityScheme::Http(oauth),
+        );
 
-        let mut aaaaa = ApiKeyValue::new("BSESS");
-        aaaaa.description = Some("Session cookie used for authentication".to_string());
-        components.add_security_scheme("cookieAuth", SecurityScheme::ApiKey(ApiKey::Cookie(aaaaa)));
+        let mut session = ApiKeyValue::new("BSESS");
+        session.description = Some("Session cookie used for authentication".to_string());
+        components.add_security_scheme(
+            "Cookie Auth (Session JWT)",
+            SecurityScheme::ApiKey(ApiKey::Cookie(session)),
+        );
     }
 }

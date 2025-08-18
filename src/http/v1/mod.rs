@@ -1,35 +1,26 @@
+#![allow(clippy::option_if_let_else)]
+
 use std::sync::Arc;
 
-use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
-use axum::{
-    Extension, Json, Router,
-    extract::{Request, State},
-    middleware,
-    response::IntoResponse,
-    routing::get,
-};
-use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
+use axum::{Extension, Json, extract::State, response::IntoResponse};
 use tower_cookies::Cookies;
-use tower_http::add_extension::AddExtensionLayer;
 use utoipa::ToSchema;
-use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::{
     auth::{
         middleware::AuthContext,
         oauth::{
             middleware::OauthContext,
-            ops::{OauthRequirement, create_token, must_oauth},
+            ops::{OauthRequirement, must_oauth},
             scopes::OauthScope,
         },
         ops::{get_user_id, remove_session},
     },
-    database::models::{oauth::OauthApp, user::User},
+    database::models::user::User,
     global::GlobalState,
     http::{HttpResult, error::ApiError},
 };
-
-use utoipa_axum::routes;
 
 pub mod auth;
 pub mod models;
@@ -42,6 +33,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
         .routes(routes!(get_user))
 }
 
+/// Get info about the current user authenticated by a session or via a oauth2 token
 #[utoipa::path(
     get,
     path = "/user",
@@ -50,7 +42,6 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
         (status = 401, description = "Unauthorized"),
         (status = 400, description = "Invalid request or login")
     ),
-    tag = "general"
 )]
 async fn get_user(
     State(global): State<Arc<GlobalState>>,

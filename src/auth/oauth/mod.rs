@@ -99,18 +99,18 @@ impl OauthErrorKind {
         match self {
             Self::AccessDenied => axum::http::StatusCode::UNAUTHORIZED,
             // Self::UnauthorizedClient => axum::http::StatusCode::UNAUTHORIZED,
-            Self::InvalidScope => axum::http::StatusCode::BAD_REQUEST,
-            Self::UnsupportedResponseType => axum::http::StatusCode::BAD_REQUEST,
-            Self::InvalidClient => axum::http::StatusCode::BAD_REQUEST,
-            // Self::InvalidGrant => axum::http::StatusCode::BAD_REQUEST,
-            Self::UnsupportedGrantType => axum::http::StatusCode::BAD_REQUEST,
-            Self::ApiErrorTransparent(e) => e.status_code(),
-            Self::InvalidExchangeId
+            Self::InvalidScope
+            | Self::UnsupportedResponseType
+            | Self::InvalidClient
+            | Self::UnsupportedGrantType
+            | Self::InvalidExchangeId
             | Self::InvalidRequest
             | Self::InvalidRedirectUri
             | Self::FailedMakingUrl
-            | Self::InvalidAuthorizeId => axum::http::StatusCode::BAD_REQUEST,
-            Self::FailedParsingScopes(_) => axum::http::StatusCode::BAD_REQUEST,
+            | Self::InvalidAuthorizeId
+            | Self::FailedParsingScopes(_) => axum::http::StatusCode::BAD_REQUEST, // dunno if these should be all 400
+            // Self::InvalidGrant => axum::http::StatusCode::BAD_REQUEST,
+            Self::ApiErrorTransparent(e) => e.status_code(),
         }
     }
 

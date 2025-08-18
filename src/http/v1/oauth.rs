@@ -2,32 +2,21 @@ use std::{str::FromStr, sync::Arc};
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{
-    Extension, Json, Router,
-    extract::{Request, State},
-    middleware,
-    response::IntoResponse,
-    routing::{get, post},
+    Extension, Json,
+    extract::{Path, State},
 };
 use axum_valid::Valid;
-use rand_chacha::{
-    ChaCha20Rng,
-    rand_core::{SeedableRng as _, le},
-};
+use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
-use tower_http::add_extension::AddExtensionLayer;
 use utoipa::ToSchema;
-use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use validator::Validate;
 
 use crate::{
     auth::{
         middleware::AuthContext,
-        oauth::{
-            middleware::OauthContext,
-            ops::{OauthRequirement, create_token, must_oauth},
-            scopes::OauthScope,
-        },
-        ops::{get_user_id, remove_session},
+        oauth::{ops::create_token, scopes::OauthScope},
+        ops::remove_session,
     },
     database::{
         models::{
@@ -39,13 +28,14 @@ use crate::{
     global::GlobalState,
     http::{HttpResult, error::ApiError, v1::models},
 };
-use utoipa_axum::routes;
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
+    // i hate this
     OpenApiRouter::new()
         .routes(routes!(create_app))
         .routes(routes!(delete_app))
         .routes(routes!(update_app))
+        .routes(routes!(get_app))
         .routes(routes!(list_apps))
         .routes(routes!(list_authorized))
         .routes(routes!(remove_authorized))
@@ -72,9 +62,10 @@ struct CreateAppResponse {
     secret_key: String,
 }
 
+/// Create a new OAuth app
 #[utoipa::path(
-    put,
-    path = "/create",
+    post,
+    path = "/apps",
     request_body = CreateApp,
     responses(
         (status = 200, description = "App created", body = CreateAppResponse),
@@ -133,16 +124,20 @@ async fn create_app(
     }))
 }
 
+// i love axum_valid. i dont need to manually do validations haha
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
-struct DeleteApp {
+struct AppParam {
     #[validate(length(equal = 32))]
     id: OauthAppId,
 }
 
+/// Delete an OAuth app by its ID
 #[utoipa::path(
     delete,
-    path = "/delete",
-    request_body = DeleteApp,
+    path = "/apps/{id}",
+    params(
+        ("id" = OauthAppId, description = "The ID of the OAuth app to delete")
+    ),
     responses(
         (status = 200, description = "App deleted"),
         (status = 401, description = "Not logged in"),
@@ -154,7 +149,7 @@ async fn delete_app(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
-    Valid(Json(request)): Valid<Json<DeleteApp>>,
+    Path(request): Path<AppParam>,
 ) -> HttpResult<()> {
     if !auth_context.is_authenticated() {
         return Err(ApiError::YouAreNotLoggedIn);
@@ -181,8 +176,8 @@ async fn delete_app(
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 struct UpdateApp {
-    #[validate(length(equal = 32))]
-    id: OauthAppId,
+    // #[validate(length(equal = 32))]
+    // id: OauthAppId,
     #[validate(length(min = 6, max = 32))]
     name: Option<String>,
     #[validate(length(max = 256))] // dunno
@@ -192,10 +187,13 @@ struct UpdateApp {
     callback_url: Option<String>,
 }
 
+/// Update an OAuth app by its ID
 #[utoipa::path(
-    post,
-    path = "/update",
-    request_body = UpdateApp,
+    put,
+    path = "/apps/{id}",
+    params(
+        ("id" = OauthAppId, description = "The ID of the OAuth app to update")
+    ),
     responses(
         (status = 200, description = "App updated"),
         (status = 401, description = "Not logged in"),
@@ -207,6 +205,7 @@ async fn update_app(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
+    Path(param): Path<AppParam>,
     Valid(Json(request)): Valid<Json<UpdateApp>>,
 ) -> HttpResult<()> {
     if !auth_context.is_authenticated() {
@@ -217,12 +216,12 @@ async fn update_app(
         return Err(ApiError::InvalidLogin);
     };
 
-    let Some(mut app) = OauthApp::get(&request.id, &global.database).await? else {
-        return Err(ApiError::OAuthAppNotFound(request.id.to_string()));
+    let Some(mut app) = OauthApp::get(&param.id, &global.database).await? else {
+        return Err(ApiError::OAuthAppNotFound(param.id.to_string()));
     };
 
     if app.created_by != user.id {
-        return Err(ApiError::OAuthAppNotOwned(request.id.to_string()));
+        return Err(ApiError::OAuthAppNotOwned(param.id.to_string()));
     }
 
     if let Some(name) = request.name {
@@ -247,17 +246,18 @@ async fn update_app(
         app.callback_url = callback_url;
     }
     let mut tx = global.database.begin().await?;
-    OauthApp::delete(&request.id, &mut tx).await?;
+    OauthApp::delete(&param.id, &mut tx).await?;
     tx.commit().await?;
 
     Ok(())
 }
 
+/// List current user created OAuth apps
 #[utoipa::path(
     get,
-    path = "/list",
+    path = "/apps",
     responses(
-        (status = 200, description = "List user's oauth apps", body = [models::OauthApp]),
+        (status = 200, description = "List user created oauth apps", body = [models::OauthApp]),
         (status = 401, description = "Not logged in")
     ),
     tag = "oauth"
@@ -281,11 +281,12 @@ async fn list_apps(
     Ok(Json(apps))
 }
 
+/// List current user authorized OAuth apps
 #[utoipa::path(
     get,
-    path = "/authorized/list",
+    path = "/authorized",
     responses(
-        (status = 200, description = "List user's authorized apps", body = [models::OauthAuthorized]),
+        (status = 200, description = "List user's authorized oauth apps", body = [models::OauthAuthorized]),
         (status = 401, description = "Not logged in")
     ),
     tag = "oauth"
@@ -313,14 +314,18 @@ async fn list_authorized(
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
-struct RemoveAuthorized {
+struct AuthorizedParam {
     #[validate(length(equal = 26))]
     id: OauthAuthorizedId,
 }
+
+/// Delete an authorized OAuth app by its id
 #[utoipa::path(
-    post,
-    path = "/authorized/remove",
-    request_body = RemoveAuthorized,
+    delete,
+    path = "/authorized/{id}",
+    params(
+        ("id" = OauthAuthorizedId, description = "The ID of the authorized OAuth app to delete")
+    ),
     responses(
         (status = 200, description = "Authorization removed"),
         (status = 401, description = "Not logged in"),
@@ -332,7 +337,7 @@ async fn remove_authorized(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
-    Valid(Json(request)): Valid<Json<RemoveAuthorized>>,
+    Valid(Path(request)): Valid<Path<AuthorizedParam>>,
 ) -> HttpResult<()> {
     if !auth_context.is_authenticated() {
         return Err(ApiError::YouAreNotLoggedIn);
@@ -357,16 +362,13 @@ async fn remove_authorized(
     Ok(())
 }
 
-#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
-struct GetAuthorized {
-    #[validate(length(equal = 26))]
-    id: OauthAuthorizedId,
-}
-
+/// Get info about an authorized OAuth app
 #[utoipa::path(
-    post,
-    path = "/authorized/get",
-    request_body = GetAuthorized,
+    get,
+    path = "/authorized/{id}",
+    params(
+        ("id" = OauthAuthorizedId, description = "The ID of the authorized OAuth app to get")
+    ),
     responses(
         (status = 200, description = "Get authorized app", body = models::OauthAuthorized),
         (status = 401, description = "Not logged in"),
@@ -374,13 +376,11 @@ struct GetAuthorized {
     ),
     tag = "oauth"
 )]
-
-// TODO: this should be a path param.
 async fn get_authorized(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
-    Valid(Json(request)): Valid<Json<GetAuthorized>>,
+    Valid(Path(request)): Valid<Path<AuthorizedParam>>,
 ) -> HttpResult<Json<models::OauthAuthorized>> {
     if !auth_context.is_authenticated() {
         return Err(ApiError::YouAreNotLoggedIn);
@@ -399,4 +399,43 @@ async fn get_authorized(
     }
 
     Ok(Json(models::OauthAuthorized::from(app)))
+}
+
+/// Get info about an OAuth app you created
+#[utoipa::path(
+    get,
+    path = "/apps/{id}",
+    params(
+        ("id" = OauthAppId, description = "The ID of the OAuth app to retrieve")
+    ),
+    responses(
+        (status = 200, description = "Get authorized app", body = models::OauthApp),
+        (status = 401, description = "Not logged in"),
+        (status = 400, description = "Validation or other error")
+    ),
+    tag = "oauth"
+)]
+async fn get_app(
+    State(global): State<Arc<GlobalState>>,
+    cookies: Cookies,
+    Extension(auth_context): Extension<AuthContext>,
+    Path(id): Path<OauthAppId>,
+) -> HttpResult<Json<models::OauthApp>> {
+    if !auth_context.is_authenticated() {
+        return Err(ApiError::YouAreNotLoggedIn);
+    }
+    let Some(user) = User::get(auth_context.user_id(), &global.database).await? else {
+        remove_session(auth_context, &cookies, &global).await?;
+        return Err(ApiError::InvalidLogin);
+    };
+
+    let Some(app) = OauthApp::get(&id, &global.database).await? else {
+        return Err(ApiError::OAuthAppNotFound(id.to_string()));
+    };
+
+    if app.created_by != user.id {
+        return Err(ApiError::OAuthAppNotFound(id.to_string()));
+    }
+
+    Ok(Json(models::OauthApp::from(app)))
 }

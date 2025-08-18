@@ -1,14 +1,10 @@
 use std::sync::Arc;
 
-use axum::{
-    Extension, Json, Router,
-    extract::State,
-    routing::{get, post},
-};
+use axum::{Extension, Json, extract::State, routing::get};
 use axum_valid::Valid;
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
-use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use validator::Validate;
 
 use crate::{
@@ -26,8 +22,6 @@ pub mod oauth;
 pub mod otp;
 pub mod password;
 pub mod totp;
-
-use utoipa_axum::routes;
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
@@ -47,6 +41,7 @@ async fn index() -> &'static str {
     "Hello, World!"
 }
 
+/// Get the current session
 #[utoipa::path(
     get,
     path = "/current",
@@ -74,6 +69,7 @@ async fn current_session(
     Ok(Json(models::Session::from(session)))
 }
 
+/// Get all the open sessions of the user
 #[utoipa::path(
     get,
     path = "/sessions",
@@ -110,6 +106,7 @@ pub struct VerifyEmail {
     code: String,
 }
 
+/// Verify the user's email to be able to login with email or user login and password
 #[utoipa::path(
     post,
     path = "/verify",
@@ -119,7 +116,7 @@ pub struct VerifyEmail {
         (status = 400, description = "Invalid code"),
         (status = 401, description = "Not authenticated")
     ),
-    tag = "auth"
+    tag = "password"
 )]
 async fn verify_email(
     State(global): State<Arc<GlobalState>>,
@@ -176,6 +173,7 @@ pub struct RecoveryOptions {
     totp: bool,
 }
 
+/// Get the available recovery options for an user. (placeholder?)
 #[utoipa::path(
     get,
     path = "/recovery-options",
@@ -208,6 +206,7 @@ async fn get_recovery_options(
     Ok(Json(options))
 }
 
+/// Sign out of this current session
 #[utoipa::path(
     post,
     path = "/signout",

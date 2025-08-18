@@ -1,6 +1,6 @@
 use axum::{Json, response::IntoResponse};
 
-use crate::{auth::oauth::OauthErrorKind, database::redis::models::RedisError};
+use crate::database::redis::models::RedisError;
 
 #[derive(Debug, serde::Serialize)]
 struct HttpError<'a> {

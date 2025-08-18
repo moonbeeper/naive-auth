@@ -3,12 +3,12 @@ use std::sync::Arc;
 use argon2::{
     Argon2, PasswordHash, PasswordHasher as _, PasswordVerifier as _, password_hash::SaltString,
 };
-use axum::{Extension, Json, Router, extract::State, routing::post};
+use axum::{Extension, Json, extract::State};
 use axum_valid::Valid;
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
-use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use validator::Validate;
 
 use crate::{
@@ -32,7 +32,6 @@ use crate::{
     },
 };
 
-use utoipa_axum::routes;
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
@@ -48,6 +47,7 @@ pub struct LoginPassword {
     password: String,
 }
 
+/// Login via user login or email and password. If you have TOTP enabled, a TOTP exchange Link ID will be returned
 #[utoipa::path(
     post,
     path = "/login",
@@ -56,9 +56,8 @@ pub struct LoginPassword {
         (status = 200, description = "Successful login, session or TOTP challenge", body = JsonEither<models::Session, TotpResponse<'static>>),
         (status = 400, description = "Bad request (invalid login, email not verified, etc)"),
     ),
-    tag = "auth"
+    tag = "password"
 )]
-#[axum::debug_handler]
 async fn login(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
@@ -138,6 +137,7 @@ pub struct RegisterPassword {
     password: String,
 }
 
+/// Register via email, login and password
 #[utoipa::path(
     post,
     path = "/register",
@@ -146,7 +146,7 @@ pub struct RegisterPassword {
         (status = 200, description = "Account registered, session returned", body = models::Session),
         (status = 400, description = "Invalid input or already exists"),
     ),
-    tag = "auth"
+    tag = "password"
 )]
 async fn register(
     State(global): State<Arc<GlobalState>>,

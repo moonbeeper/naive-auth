@@ -25,7 +25,7 @@ impl From<i64> for OauthScope {
 
 impl Display for OauthScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = format!("{:?}", self);
+        let s = format!("{self:?}");
         let prefix = "OauthScope(";
         let suffix = ")";
         let inner = &s[prefix.len()..s.len() - suffix.len()];

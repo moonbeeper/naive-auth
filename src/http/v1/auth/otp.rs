@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, Router, extract::State, routing::post};
+use axum::{Extension, Json, extract::State};
 use axum_valid::Valid;
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
-use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use validator::Validate;
 
 use crate::{
@@ -31,8 +31,6 @@ use crate::{
     },
 };
 
-use utoipa_axum::routes;
-
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
         .routes(routes!(login))
@@ -51,6 +49,8 @@ pub struct Login {
 pub struct AuthResponse {
     link_id: FlowId,
 }
+
+/// Login or register via a code! (If the account isn't found, it will start the register flow)
 #[utoipa::path(
     post,
     path = "/login",
@@ -59,7 +59,7 @@ pub struct AuthResponse {
         (status = 200, description = "Login flow started", body = AuthResponse),
         (status = 400, description = "Invalid login, email not verified, etc."),
     ),
-    tag = "auth"
+    tag = "otp"
 )]
 async fn login(
     State(global): State<Arc<GlobalState>>,
@@ -165,6 +165,7 @@ pub struct AuthExchange {
     code: String,
 }
 
+/// Exchange the OTP code sent to the user's email for a session
 #[utoipa::path(
     post,
     path = "/exchange",
@@ -173,7 +174,7 @@ pub struct AuthExchange {
         (status = 200, description = "Exchanged for session or TOTP challenge", body = JsonEither<models::Session, TotpResponse>),
         (status = 400, description = "Invalid code or login"),
     ),
-    tag = "auth"
+    tag = "otp"
 )]
 async fn exchange(
     State(global): State<Arc<GlobalState>>,
@@ -287,6 +288,7 @@ pub struct RecoverAccount {
     email: String,
 }
 
+/// Recover an account via an OTP code sent to the user's email
 #[utoipa::path(
     post,
     path = "/recover",
@@ -295,7 +297,7 @@ pub struct RecoverAccount {
         (status = 200, description = "Recovery flow started", body = AuthResponse),
         (status = 400, description = "Invalid login or email not verified"),
     ),
-    tag = "auth"
+    tag = "otp"
 )]
 async fn recover_account(
     State(global): State<Arc<GlobalState>>,
@@ -353,6 +355,7 @@ pub struct RecoverAccountExchange {
     code: String,
 }
 
+/// Exchange the OTP code sent to the user's email for a session. (this is actually a copy of the login one?)
 #[utoipa::path(
     post,
     path = "/recover/exchange",
@@ -361,7 +364,7 @@ pub struct RecoverAccountExchange {
         (status = 200, description = "Session after recovery", body = models::Session),
         (status = 400, description = "Invalid code, login, or flow not found"),
     ),
-    tag = "auth"
+    tag = "otp"
 )]
 async fn recover_account_exchange(
     State(global): State<Arc<GlobalState>>,

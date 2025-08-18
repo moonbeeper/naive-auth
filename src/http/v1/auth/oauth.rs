@@ -2,16 +2,15 @@ use std::{str::FromStr, sync::Arc};
 
 use argon2::{Argon2, PasswordHash, PasswordVerifier as _};
 use axum::{
-    Extension, Form, Json, Router,
+    Extension, Form, Json,
     extract::{Query, State},
     response::{IntoResponse as _, Redirect, Response},
-    routing::{get, post},
 };
 use axum_valid::Valid;
 use tower_cookies::Cookies;
 use url::Url;
 use utoipa::ToSchema;
-use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use validator::Validate;
 
 use crate::{
@@ -38,7 +37,6 @@ use crate::{
     http::error::ApiError,
 };
 
-use utoipa_axum::routes;
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
         .routes(routes!(pre_authorize, authorize))
@@ -73,6 +71,7 @@ pub struct PreAuthorizeResponse {
     link_id: FlowId,
 }
 
+/// Get the Link ID to be able to authorize or refuse authorization for the OAuth client
 #[utoipa::path(
     get,
     path = "/authorize",
@@ -179,6 +178,7 @@ pub struct AuthorizeResponse {
     state: Option<String>,
 }
 
+/// Exchange the Link ID to authorize or refuse authorizing a OAuth client
 #[utoipa::path(
     post,
     path = "/authorize",
@@ -269,6 +269,7 @@ pub struct ExchangeResponse {
     token_type: TokenType,
 }
 
+/// Exchange a code for a Bearer access token
 #[utoipa::path(
     post,
     path = "/token",
