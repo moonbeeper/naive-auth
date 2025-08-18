@@ -15,6 +15,8 @@ use rand_chacha::{
 };
 use tower_cookies::Cookies;
 use tower_http::add_extension::AddExtensionLayer;
+use utoipa::ToSchema;
+use utoipa_axum::router::OpenApiRouter;
 use validator::Validate;
 
 use crate::{
@@ -38,8 +40,8 @@ use crate::{
     http::{HttpResult, error::ApiError, v1::models},
 };
 
-pub fn routes() -> Router<Arc<GlobalState>> {
-    Router::new()
+pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
+    OpenApiRouter::new()
         .route("/create", post(create_app))
         .route("/delete", post(delete_app))
         .route("/update", post(update_app))
@@ -49,23 +51,37 @@ pub fn routes() -> Router<Arc<GlobalState>> {
         .route("/authorized/get", post(get_authorized))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 struct CreateApp {
+    #[schema(example = "My App")]
     #[validate(length(min = 6, max = 32))]
     name: String,
+    #[schema(example = "A description for the oauth app")]
     #[validate(length(max = 256))] // dunno
     description: String,
     scopes: Vec<String>,
+    #[schema(example = "https://oauthdebugger.com/debug")]
     #[validate(url)]
     callback_url: String,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 struct CreateAppResponse {
     id: StringId,
     secret_key: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/create",
+    request_body = CreateApp,
+    responses(
+        (status = 200, description = "App created", body = CreateAppResponse),
+        (status = 401, description = "Not logged in"),
+        (status = 400, description = "Validation or other error")
+    ),
+    tag = "oauth"
+)]
 async fn create_app(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -116,12 +132,23 @@ async fn create_app(
     }))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 struct DeleteApp {
     #[validate(length(equal = 32))]
     id: OauthAppId,
 }
 
+#[utoipa::path(
+    post,
+    path = "/delete",
+    request_body = DeleteApp,
+    responses(
+        (status = 200, description = "App deleted"),
+        (status = 401, description = "Not logged in"),
+        (status = 400, description = "Validation or other error")
+    ),
+    tag = "oauth"
+)]
 async fn delete_app(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -151,7 +178,7 @@ async fn delete_app(
     Ok(())
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 struct UpdateApp {
     #[validate(length(equal = 32))]
     id: OauthAppId,
@@ -164,6 +191,17 @@ struct UpdateApp {
     callback_url: Option<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/update",
+    request_body = UpdateApp,
+    responses(
+        (status = 200, description = "App updated"),
+        (status = 401, description = "Not logged in"),
+        (status = 400, description = "Validation or other error")
+    ),
+    tag = "oauth"
+)]
 async fn update_app(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -214,6 +252,15 @@ async fn update_app(
     Ok(())
 }
 
+#[utoipa::path(
+    get,
+    path = "/list",
+    responses(
+        (status = 200, description = "List user's oauth apps", body = [models::OauthApp]),
+        (status = 401, description = "Not logged in")
+    ),
+    tag = "oauth"
+)]
 async fn list_apps(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -233,6 +280,15 @@ async fn list_apps(
     Ok(Json(apps))
 }
 
+#[utoipa::path(
+    get,
+    path = "/authorized/list",
+    responses(
+        (status = 200, description = "List user's authorized apps", body = [models::OauthAuthorized]),
+        (status = 401, description = "Not logged in")
+    ),
+    tag = "oauth"
+)]
 async fn list_authorized(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -255,12 +311,22 @@ async fn list_authorized(
     Ok(Json(apps))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 struct RemoveAuthorized {
     #[validate(length(equal = 26))]
     id: OauthAuthorizedId,
 }
-
+#[utoipa::path(
+    post,
+    path = "/authorized/remove",
+    request_body = RemoveAuthorized,
+    responses(
+        (status = 200, description = "Authorization removed"),
+        (status = 401, description = "Not logged in"),
+        (status = 400, description = "Validation or other error")
+    ),
+    tag = "oauth"
+)]
 async fn remove_authorized(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -290,11 +356,23 @@ async fn remove_authorized(
     Ok(())
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 struct GetAuthorized {
     #[validate(length(equal = 26))]
     id: OauthAuthorizedId,
 }
+
+#[utoipa::path(
+    post,
+    path = "/authorized/get",
+    request_body = GetAuthorized,
+    responses(
+        (status = 200, description = "Get authorized app", body = models::OauthAuthorized),
+        (status = 401, description = "Not logged in"),
+        (status = 400, description = "Validation or other error")
+    ),
+    tag = "oauth"
+)]
 
 // TODO: this should be a path param.
 async fn get_authorized(

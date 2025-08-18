@@ -1,3 +1,5 @@
+use utoipa::ToSchema;
+
 use crate::{
     auth::oauth::scopes::OauthScope,
     database::{
@@ -10,7 +12,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct Session {
     pub id: SessionId,
     pub name: String,
@@ -31,7 +33,7 @@ impl From<database::models::session::Session> for Session {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct User {
     pub id: UserId,
     pub login: String,
@@ -70,7 +72,7 @@ impl User {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct OauthApp {
     id: OauthAppId,
     name: String,
@@ -98,7 +100,7 @@ impl From<database::models::oauth::OauthApp> for OauthApp {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct OauthAuthorized {
     pub id: OauthAuthorizedId,
     pub app: OauthAppId,

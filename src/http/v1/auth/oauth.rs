@@ -10,6 +10,8 @@ use axum::{
 use axum_valid::Valid;
 use tower_cookies::Cookies;
 use url::Url;
+use utoipa::ToSchema;
+use utoipa_axum::router::OpenApiRouter;
 use validator::Validate;
 
 use crate::{
@@ -36,14 +38,14 @@ use crate::{
     http::error::ApiError,
 };
 
-pub fn routes() -> Router<Arc<GlobalState>> {
-    Router::new()
+pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
+    OpenApiRouter::new()
         .route("/authorize", get(pre_authorize).post(authorize))
         .route("/token", post(exchange))
 }
 
 // enforces use of only "code" via mr serde
-#[derive(Debug, serde::Deserialize, PartialEq, Eq)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum OauthResponseType {
     Code,
@@ -54,7 +56,7 @@ pub enum OauthResponseType {
     Hybrid2,
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Validate, ToSchema, utoipa::IntoParams)]
 pub struct PreAuthorize {
     response_type: OauthResponseType,
     #[validate(length(equal = 32))]
@@ -65,11 +67,21 @@ pub struct PreAuthorize {
     state: Option<String>,
 }
 
-#[derive(Debug, serde::Serialize)]
-struct PreAuthorizeResponse {
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct PreAuthorizeResponse {
     link_id: FlowId,
 }
 
+#[utoipa::path(
+    get,
+    path = "/oauth/authorize",
+    params(PreAuthorize),
+    responses(
+        (status = 200, description = "Authorization needed", body = PreAuthorizeResponse),
+        (status = 400, description = "Invalid request or not authenticated")
+    ),
+    tag = "oauth"
+)]
 async fn pre_authorize(
     State(global): State<Arc<GlobalState>>,
     Query(request): Query<PreAuthorize>,
@@ -144,28 +156,38 @@ async fn pre_authorize(
     }
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct Authorize {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct Authorize {
     #[validate(length(equal = 26))]
     link_id: FlowId,
     authorize: bool,
 }
 
-#[derive(Debug, serde::Serialize, Default)]
-enum TokenType {
+#[derive(Debug, serde::Serialize, Default, ToSchema)]
+pub enum TokenType {
     #[default]
     Bearer,
     #[serde(rename = "MAC")]
     _Mac, // never will use this
 }
 
-#[derive(Debug, serde::Serialize)]
-struct AuthorizeResponse {
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct AuthorizeResponse {
     code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     state: Option<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/oauth/authorize",
+    request_body = Authorize,
+    responses(
+        (status = 200, description = "Authorization approved", body = AuthorizeResponse),
+        (status = 400, description = "Invalid request or not authenticated")
+    ),
+    tag = "oauth"
+)]
 async fn authorize(
     State(global): State<Arc<GlobalState>>,
     Extension(auth_context): Extension<AuthContext>,
@@ -221,14 +243,14 @@ async fn authorize(
     }
 }
 
-#[derive(Debug, serde::Deserialize, PartialEq, Eq)]
-enum GrantType {
+#[derive(Debug, serde::Deserialize, PartialEq, Eq, ToSchema)]
+pub enum GrantType {
     #[serde(rename = "authorization_code")]
     AuthorizationCode,
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct ExchangeRequest {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct ExchangeRequest {
     grant_type: GrantType,
     #[validate(length(equal = 32))]
     code: StringId,
@@ -240,13 +262,22 @@ struct ExchangeRequest {
     client_secret: String,
 }
 
-#[derive(Debug, serde::Serialize)]
-struct ExchangeResponse {
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct ExchangeResponse {
     access_token: String,
     token_type: TokenType,
 }
 
-#[axum::debug_handler]
+#[utoipa::path(
+    post,
+    path = "/oauth/token",
+    request_body = ExchangeRequest,
+    responses(
+        (status = 200, description = "OAuth token exchanged", body = ExchangeResponse),
+        (status = 400, description = "Invalid request or client")
+    ),
+    tag = "oauth"
+)]
 async fn exchange(
     State(global): State<Arc<GlobalState>>,
     Extension(auth_context): Extension<AuthContext>,

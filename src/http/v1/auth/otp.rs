@@ -3,6 +3,8 @@ use std::sync::Arc;
 use axum::{Extension, Json, Router, extract::State, routing::post};
 use axum_valid::Valid;
 use tower_cookies::Cookies;
+use utoipa::ToSchema;
+use utoipa_axum::router::OpenApiRouter;
 use validator::Validate;
 
 use crate::{
@@ -29,25 +31,34 @@ use crate::{
     },
 };
 
-pub fn routes() -> Router<Arc<GlobalState>> {
-    Router::new()
+pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
+    OpenApiRouter::new()
         .route("/login", post(login))
         .route("/exchange", post(exchange))
         .route("/recover", post(recover_account))
         .route("/recover/exchange", post(recover_account_exchange))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct Login {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct Login {
     #[validate(email)]
     email: String,
 }
 
-#[derive(Debug, serde::Serialize)]
-struct AuthResponse {
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct AuthResponse {
     link_id: FlowId,
 }
-
+#[utoipa::path(
+    post,
+    path = "/login",
+    request_body = Login,
+    responses(
+        (status = 200, description = "Login flow started", body = AuthResponse),
+        (status = 400, description = "Invalid login, email not verified, etc."),
+    ),
+    tag = "auth"
+)]
 async fn login(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
@@ -104,8 +115,8 @@ async fn login(
     Ok(Json(AuthResponse { link_id: flow_id }))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct RegisterPassword {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct RegisterPassword {
     #[validate(email)]
     email: String,
     #[validate(length(min = 6))]
@@ -142,8 +153,8 @@ async fn register(global: Arc<GlobalState>, email: String) -> HttpResult<Json<Au
     Ok(Json(AuthResponse { link_id: flow_id }))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct AuthExchange {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct AuthExchange {
     #[validate(length(equal = 26))]
     link_id: FlowId,
     #[validate(email)]
@@ -152,6 +163,16 @@ struct AuthExchange {
     code: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/exchange",
+    request_body = AuthExchange,
+    responses(
+        (status = 200, description = "Exchanged for session or TOTP challenge", body = JsonEither<models::Session, TotpResponse>),
+        (status = 400, description = "Invalid code or login"),
+    ),
+    tag = "auth"
+)]
 async fn exchange(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
@@ -196,7 +217,7 @@ async fn exchange(
 
         if user.totp_secret.is_some() {
             let response = create_totp_exchange(&user, &global.redis).await?;
-            return Ok(JsonEither::right(response));
+            return Ok(JsonEither::Right(response));
         }
 
         let sess = create_session("temporary".into(), &user, &global.settings)?;
@@ -211,7 +232,7 @@ async fn exchange(
             .send(&user.email, AuthEmails::NewLogin { login: user.login })
             .await?;
 
-        return Ok(JsonEither::left(models::Session::from(sess.session)));
+        return Ok(JsonEither::Left(models::Session::from(sess.session)));
     } else if let Some(AuthFlow::OtpRegisterRequest { secret }) = flow {
         if (User::get_by_email(&request.email, &global.database).await?).is_some() {
             return Err(ApiError::InvalidLogin);
@@ -252,18 +273,28 @@ async fn exchange(
             .send(&user.email, AuthEmails::NewLogin { login: user.login })
             .await?;
 
-        return Ok(JsonEither::left(models::Session::from(sess.session)));
+        return Ok(JsonEither::Left(models::Session::from(sess.session)));
     }
 
     Err(ApiError::InvalidLogin)
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct RecoverAccount {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct RecoverAccount {
     #[validate(email)]
     email: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/recover",
+    request_body = RecoverAccount,
+    responses(
+        (status = 200, description = "Recovery flow started", body = AuthResponse),
+        (status = 400, description = "Invalid login or email not verified"),
+    ),
+    tag = "auth"
+)]
 async fn recover_account(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
@@ -310,8 +341,8 @@ async fn recover_account(
     Ok(Json(AuthResponse { link_id: flow_id }))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct RecoverAccountExchange {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct RecoverAccountExchange {
     #[validate(email)]
     email: String,
     #[validate(length(equal = 26))]
@@ -320,6 +351,16 @@ struct RecoverAccountExchange {
     code: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/recover/exchange",
+    request_body = RecoverAccountExchange,
+    responses(
+        (status = 200, description = "Session after recovery", body = models::Session),
+        (status = 400, description = "Invalid code, login, or flow not found"),
+    ),
+    tag = "auth"
+)]
 async fn recover_account_exchange(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,

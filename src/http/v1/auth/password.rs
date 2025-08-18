@@ -7,6 +7,8 @@ use axum::{Extension, Json, Router, extract::State, routing::post};
 use axum_valid::Valid;
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
+use utoipa::ToSchema;
+use utoipa_axum::router::OpenApiRouter;
 use validator::Validate;
 
 use crate::{
@@ -30,20 +32,31 @@ use crate::{
     },
 };
 
-pub fn routes() -> Router<Arc<GlobalState>> {
-    Router::new()
+pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
+    OpenApiRouter::new()
         .route("/login", post(login))
         .route("/register", post(register))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct LoginPassword {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct LoginPassword {
     #[serde(rename = "login")]
     login_or_email: String,
     #[validate(length(min = 9))]
     password: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/login",
+    request_body = LoginPassword,
+    responses(
+        (status = 200, description = "Successful login, session or TOTP challenge", body = JsonEither<models::Session, TotpResponse<'static>>),
+        (status = 400, description = "Bad request (invalid login, email not verified, etc)"),
+    ),
+    tag = "auth"
+)]
+#[axum::debug_handler]
 async fn login(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
@@ -95,7 +108,7 @@ async fn login(
 
     if user.totp_secret.is_some() {
         let response = create_totp_exchange(&user, &global.redis).await?;
-        return Ok(JsonEither::right(response));
+        return Ok(JsonEither::Right(response));
     }
 
     let sess = create_session("temporary".into(), &user, &global.settings)?;
@@ -110,11 +123,11 @@ async fn login(
         .send(&user.email, AuthEmails::NewLogin { login })
         .await?;
 
-    Ok(JsonEither::left(models::Session::from(sess.session)))
+    Ok(JsonEither::Left(models::Session::from(sess.session)))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct RegisterPassword {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct RegisterPassword {
     #[validate(email)]
     email: String,
     #[validate(length(min = 6))]
@@ -123,6 +136,16 @@ struct RegisterPassword {
     password: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/register",
+    request_body = RegisterPassword,
+    responses(
+        (status = 200, description = "Account registered, session returned", body = models::Session),
+        (status = 400, description = "Invalid input or already exists"),
+    ),
+    tag = "auth"
+)]
 async fn register(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,

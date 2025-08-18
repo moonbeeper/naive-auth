@@ -7,6 +7,8 @@ use axum::{
 };
 use axum_valid::Valid;
 use tower_cookies::Cookies;
+use utoipa::ToSchema;
+use utoipa_axum::router::OpenApiRouter;
 use validator::Validate;
 
 use crate::{
@@ -20,13 +22,13 @@ use crate::{
     http::{HttpResult, error::ApiError, v1::models},
 };
 
-mod oauth;
-mod otp;
-mod password;
-mod totp;
+pub mod oauth;
+pub mod otp;
+pub mod password;
+pub mod totp;
 
-pub fn routes() -> Router<Arc<GlobalState>> {
-    Router::new()
+pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
+    OpenApiRouter::new()
         .route("/", get(index))
         .merge(password::routes())
         .nest("/otp", otp::routes())
@@ -43,6 +45,16 @@ async fn index() -> &'static str {
     "Hello, World!"
 }
 
+#[utoipa::path(
+    get,
+    path = "/current",
+    responses(
+        (status = 200, description = "Current session", body = models::Session),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Invalid login or session")
+    ),
+    tag = "auth"
+)]
 async fn current_session(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -60,6 +72,15 @@ async fn current_session(
     Ok(Json(models::Session::from(session)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/sessions",
+    responses(
+        (status = 200, description = "List of sessions", body = Vec<models::Session>),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "auth"
+)]
 async fn list_sessions(
     State(global): State<Arc<GlobalState>>,
     Extension(auth_context): Extension<AuthContext>,
@@ -79,14 +100,25 @@ async fn list_sessions(
     Ok(Json(sessions))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct VerifyEmail {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct VerifyEmail {
     #[validate(email)]
     email: String,
     #[validate(length(equal = 6))]
     code: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/verify",
+    request_body = VerifyEmail,
+    responses(
+        (status = 200, description = "Email verified"),
+        (status = 400, description = "Invalid code"),
+        (status = 401, description = "Not authenticated")
+    ),
+    tag = "auth"
+)]
 async fn verify_email(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -135,13 +167,23 @@ async fn verify_email(
     Err(ApiError::InvalidEmailVerification)
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 
-struct RecoveryOptions {
+pub struct RecoveryOptions {
     otp: bool,
     totp: bool,
 }
 
+#[utoipa::path(
+    get,
+    path = "/recovery-options",
+    responses(
+        (status = 200, description = "Recovery options", body = RecoveryOptions),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Invalid login")
+    ),
+    tag = "auth"
+)]
 async fn get_recovery_options(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -164,6 +206,15 @@ async fn get_recovery_options(
     Ok(Json(options))
 }
 
+#[utoipa::path(
+    post,
+    path = "/signout",
+    responses(
+        (status = 200, description = "Signed out"),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "auth"
+)]
 async fn signout(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,

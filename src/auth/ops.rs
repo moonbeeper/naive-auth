@@ -5,6 +5,7 @@ use rand_chacha::{
     rand_core::{RngCore, SeedableRng as _},
 };
 use tower_cookies::{Cookie, Cookies};
+use utoipa::ToSchema;
 
 use crate::{
     auth::{self, middleware::AuthContext, oauth::middleware::OauthContext, ticket::AuthTicket},
@@ -111,7 +112,7 @@ pub fn build_cookie(
 
 // todo: hack. Its a copy of the HttpError with the added link_id
 // should this even be imported by the routes? i mean like there's no other way to return it otherwise
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, ToSchema)]
 pub struct TotpResponse<'a> {
     pub error: &'a str,
     pub message: String,
@@ -165,7 +166,7 @@ pub fn get_totp_recovery_codes(secret: &str) -> Vec<String> {
         .collect()
 }
 
-pub fn get_user_id(auth_context: &AuthContext, oauth_context: &OauthContext) -> UserId {
+pub const fn get_user_id(auth_context: &AuthContext, oauth_context: &OauthContext) -> UserId {
     if oauth_context.is_some() {
         oauth_context.user_id()
     } else {

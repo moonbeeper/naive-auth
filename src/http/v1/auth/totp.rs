@@ -3,6 +3,8 @@ use std::sync::Arc;
 use axum::{Extension, Json, Router, extract::State, routing::post};
 use axum_valid::Valid;
 use tower_cookies::Cookies;
+use utoipa::ToSchema;
+use utoipa_axum::router::OpenApiRouter;
 use validator::Validate;
 
 use crate::{
@@ -24,8 +26,8 @@ use crate::{
     http::{HttpResult, error::ApiError, v1::models},
 };
 
-pub fn routes() -> Router<Arc<GlobalState>> {
-    Router::new()
+pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
+    OpenApiRouter::new()
         .route("/exchange", post(exchange))
         .route("/enable", post(enable))
         .route("/enable/exchange", post(enable_exchange))
@@ -33,14 +35,25 @@ pub fn routes() -> Router<Arc<GlobalState>> {
         .route("/disable", post(disable))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct Exchange {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct Exchange {
     #[validate(length(equal = 26))]
     link_id: FlowId,
     #[validate(length(equal = 6))]
     code: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/exchange",
+    request_body = Exchange,
+    responses(
+        (status = 200, description = "Successful TOTP exchange", body = models::Session),
+        (status = 400, description = "Invalid TOTP code or flow"),
+        (status = 401, description = "Not logged in"),
+    ),
+    tag = "totp"
+)]
 async fn exchange(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
@@ -100,12 +113,22 @@ async fn exchange(
     Err(ApiError::InvalidLogin)
 }
 
-#[derive(Debug, serde::Serialize)]
-struct EnableResponse {
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct EnableResponse {
     secret: String,
     recovery_codes: Vec<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/enable",
+    responses(
+        (status = 200, description = "Enable TOTP response", body = EnableResponse),
+        (status = 400, description = "TOTP already enabled or invalid login"),
+        (status = 401, description = "Not logged in")
+    ),
+    tag = "totp"
+)]
 async fn enable(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -165,12 +188,22 @@ async fn enable(
     }))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct EnableExchange {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct EnableExchange {
     #[validate(length(equal = 6))]
     code: String,
 }
-
+#[utoipa::path(
+    post,
+    path = "/enable/exchange",
+    request_body = EnableExchange,
+    responses(
+        (status = 200, description = "TOTP enabled successfully"),
+        (status = 400, description = "Invalid code or flow"),
+        (status = 401, description = "Not logged in")
+    ),
+    tag = "totp"
+)]
 async fn enable_exchange(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
@@ -238,14 +271,25 @@ async fn enable_exchange(
     Err(ApiError::TotpFlowNotFound)
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct RecoverAccount {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct RecoverAccount {
     #[validate(email)]
     email: String,
     #[validate(length(equal = 11))]
     recovery_code: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/recovery",
+    request_body = RecoverAccount,
+    responses(
+        (status = 200, description = "Session after recovery", body = models::Session),
+        (status = 400, description = "Invalid code or login"),
+        (status = 401, description = "Not logged in")
+    ),
+    tag = "totp"
+)]
 async fn recover_account(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
@@ -293,12 +337,23 @@ async fn recover_account(
     Ok(Json(models::Session::from(sess.session)))
 }
 
-#[derive(Debug, serde::Deserialize, Validate)]
-struct Disable {
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct Disable {
     #[validate(length(equal = 6))]
     code: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/disable",
+    request_body = Disable,
+    responses(
+        (status = 200, description = "TOTP disabled successfully"),
+        (status = 400, description = "Invalid code or TOTP not enabled"),
+        (status = 401, description = "Not logged in")
+    ),
+    tag = "totp"
+)]
 async fn disable(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,

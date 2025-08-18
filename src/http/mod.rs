@@ -4,10 +4,22 @@ use axum::{Router, routing::get};
 use tokio::{net::TcpSocket, sync::oneshot};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
+use utoipa::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    auth::{middleware::AuthManagerLayer, oauth::middleware::OauthManagerLayer},
+    auth::{middleware::AuthManagerLayer, oauth::middleware::OauthManagerLayer, ops::TotpResponse},
     global::GlobalState,
+    http::v1::{
+        JsonEither,
+        auth::{
+            RecoveryOptions, VerifyEmail, oauth,
+            otp::{self, AuthResponse},
+            totp,
+        },
+        models,
+    },
 };
 
 pub mod error;
@@ -15,8 +27,19 @@ mod v1;
 
 pub type HttpResult<T> = Result<T, error::ApiError>;
 
-fn routes(global: &Arc<GlobalState>) -> Router {
-    Router::new()
+#[derive(OpenApi)]
+#[openapi(
+    tags(
+        (name = "auth", description = "Authentication endpoints"),
+        (name = "oauth", description = "OAuth2 endpoints"),
+        (name = "totp", description = "TOTP endpoints"),
+        (name = "otp", description = "OTP endpoints")
+    )
+)]
+pub struct ApiDoc;
+
+fn routes(global: &Arc<GlobalState>) -> OpenApiRouter {
+    OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/v1", v1::routes())
         .route("/", get(|| async { "Hello, World!" }))
         .layer(
@@ -41,8 +64,12 @@ pub async fn run(
 
     socket.bind(global.settings.http.bind)?;
     let listener = socket.listen(1024)?;
+    let router = routes(&global).split_for_parts();
+    let router = router
+        .0
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", router.1.clone()));
 
-    axum::serve(listener, routes(&global))
+    axum::serve(listener, router)
         .with_graceful_shutdown(async move { _ = shutdown_signal.await })
         .await
         .expect("Failed to start the HTTP server");

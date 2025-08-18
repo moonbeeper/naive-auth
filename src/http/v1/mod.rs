@@ -11,6 +11,8 @@ use axum::{
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
 use tower_http::add_extension::AddExtensionLayer;
+use utoipa::ToSchema;
+use utoipa_axum::router::OpenApiRouter;
 
 use crate::{
     auth::{
@@ -27,17 +29,27 @@ use crate::{
     http::{HttpResult, error::ApiError},
 };
 
-mod auth;
+pub mod auth;
 pub mod models;
-mod oauth;
+pub mod oauth;
 
-pub fn routes() -> Router<Arc<GlobalState>> {
-    Router::new()
+pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
+    OpenApiRouter::new()
         .nest("/auth", auth::routes())
         .nest("/oauth", oauth::routes())
         .route("/user", get(get_user))
 }
 
+#[utoipa::path(
+    get,
+    path = "/user",
+    responses(
+        (status = 200, description = "User info", body = models::User),
+        (status = 401, description = "Unauthorized"),
+        (status = 400, description = "Invalid request or login")
+    ),
+    tag = "user"
+)]
 async fn get_user(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -85,27 +97,22 @@ async fn get_user(
     )))
 }
 
-// I don't know where to put this lol
-struct JsonEither<L, R>(either::Either<Json<L>, Json<R>>);
+#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+#[serde(untagged)]
+pub enum JsonEither<L, R> {
+    Left(L),
+    Right(R),
+}
 
 impl<L, R> IntoResponse for JsonEither<L, R>
 where
-    Json<L>: IntoResponse,
-    Json<R>: IntoResponse,
+    L: serde::Serialize,
+    R: serde::Serialize,
 {
     fn into_response(self) -> axum::response::Response {
-        match self.0 {
-            either::Either::Left(data) => data.into_response(),
-            either::Either::Right(data) => data.into_response(),
+        match self {
+            Self::Left(l) => Json(l).into_response(),
+            Self::Right(r) => Json(r).into_response(),
         }
-    }
-}
-
-impl<L, R> JsonEither<L, R> {
-    pub const fn left(data: L) -> Self {
-        Self(either::Either::Left(Json(data)))
-    }
-    pub const fn right(data: R) -> Self {
-        Self(either::Either::Right(Json(data)))
     }
 }

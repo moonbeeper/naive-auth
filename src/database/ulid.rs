@@ -5,9 +5,12 @@ use sqlx::{
     error::BoxDynError,
     postgres::{PgArgumentBuffer, PgHasArrayType, PgTypeInfo, PgValueRef},
 };
+use utoipa::ToSchema;
 use validator::ValidateLength;
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, ToSchema,
+)]
 pub struct Ulid(pub ulid::Ulid);
 
 impl Default for Ulid {

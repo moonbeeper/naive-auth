@@ -4,9 +4,12 @@ use rand_chacha::{
     ChaCha20Rng,
     rand_core::{RngCore as _, SeedableRng as _},
 };
+use utoipa::ToSchema;
 use validator::ValidateLength;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, sqlx::Type)]
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, sqlx::Type, ToSchema,
+)]
 #[sqlx(transparent)]
 pub struct StringId(pub String);
 
