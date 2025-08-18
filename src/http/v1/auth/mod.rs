@@ -27,17 +27,19 @@ pub mod otp;
 pub mod password;
 pub mod totp;
 
+use utoipa_axum::routes;
+
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
         .route("/", get(index))
         .merge(password::routes())
         .nest("/otp", otp::routes())
         .nest("/totp", totp::routes())
-        .route("/current", get(current_session))
-        .route("/sessions", get(list_sessions))
-        .route("/verify", post(verify_email))
-        .route("/recovery-options", get(get_recovery_options))
-        .route("/signout", post(signout))
+        .routes(routes!(current_session))
+        .routes(routes!(list_sessions))
+        .routes(routes!(verify_email))
+        .routes(routes!(get_recovery_options))
+        .routes(routes!(signout))
         .nest("/oauth", oauth::routes())
 }
 

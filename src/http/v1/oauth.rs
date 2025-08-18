@@ -39,16 +39,17 @@ use crate::{
     global::GlobalState,
     http::{HttpResult, error::ApiError, v1::models},
 };
+use utoipa_axum::routes;
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
-        .route("/create", post(create_app))
-        .route("/delete", post(delete_app))
-        .route("/update", post(update_app))
-        .route("/list", get(list_apps))
-        .route("/authorized/list", get(list_authorized))
-        .route("/authorized/remove", post(remove_authorized))
-        .route("/authorized/get", post(get_authorized))
+        .routes(routes!(create_app))
+        .routes(routes!(delete_app))
+        .routes(routes!(update_app))
+        .routes(routes!(list_apps))
+        .routes(routes!(list_authorized))
+        .routes(routes!(remove_authorized))
+        .routes(routes!(get_authorized))
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
@@ -72,7 +73,7 @@ struct CreateAppResponse {
 }
 
 #[utoipa::path(
-    post,
+    put,
     path = "/create",
     request_body = CreateApp,
     responses(
@@ -139,7 +140,7 @@ struct DeleteApp {
 }
 
 #[utoipa::path(
-    post,
+    delete,
     path = "/delete",
     request_body = DeleteApp,
     responses(

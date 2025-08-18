@@ -38,10 +38,11 @@ use crate::{
     http::error::ApiError,
 };
 
+use utoipa_axum::routes;
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
-        .route("/authorize", get(pre_authorize).post(authorize))
-        .route("/token", post(exchange))
+        .routes(routes!(pre_authorize, authorize))
+        .routes(routes!(exchange))
 }
 
 // enforces use of only "code" via mr serde
@@ -74,7 +75,7 @@ pub struct PreAuthorizeResponse {
 
 #[utoipa::path(
     get,
-    path = "/oauth/authorize",
+    path = "/authorize",
     params(PreAuthorize),
     responses(
         (status = 200, description = "Authorization needed", body = PreAuthorizeResponse),
@@ -180,7 +181,7 @@ pub struct AuthorizeResponse {
 
 #[utoipa::path(
     post,
-    path = "/oauth/authorize",
+    path = "/authorize",
     request_body = Authorize,
     responses(
         (status = 200, description = "Authorization approved", body = AuthorizeResponse),
@@ -270,7 +271,7 @@ pub struct ExchangeResponse {
 
 #[utoipa::path(
     post,
-    path = "/oauth/token",
+    path = "/token",
     request_body = ExchangeRequest,
     responses(
         (status = 200, description = "OAuth token exchanged", body = ExchangeResponse),

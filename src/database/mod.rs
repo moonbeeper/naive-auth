@@ -4,8 +4,8 @@ use crate::settings::DatabaseSettings;
 
 pub mod models;
 pub mod redis;
-pub mod ulid;
 pub mod string_id;
+pub mod ulid;
 
 type DatabaseError<T> = Result<T, sqlx::Error>;
 

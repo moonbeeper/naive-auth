@@ -4,7 +4,13 @@ use axum::{Router, routing::get};
 use tokio::{net::TcpSocket, sync::oneshot};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
-use utoipa::OpenApi;
+use utoipa::{
+    OpenApi,
+    openapi::{
+        extensions::Extensions,
+        security::{ApiKey, ApiKeyValue, Http, HttpAuthScheme, SecurityScheme},
+    },
+};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -29,11 +35,16 @@ pub type HttpResult<T> = Result<T, error::ApiError>;
 
 #[derive(OpenApi)]
 #[openapi(
+    security(
+        ("bearerAuth" = []),
+        ("cookieAuth" = [])
+    ),
+    modifiers(&WhyUtoipa),
     tags(
         (name = "auth", description = "Authentication endpoints"),
         (name = "oauth", description = "OAuth2 endpoints"),
         (name = "totp", description = "TOTP endpoints"),
-        (name = "otp", description = "OTP endpoints")
+        (name = "general", description = "Typical or useful endpoints"),
     )
 )]
 pub struct ApiDoc;
@@ -75,4 +86,26 @@ pub async fn run(
         .expect("Failed to start the HTTP server");
 
     Ok(())
+}
+
+struct WhyUtoipa;
+
+impl utoipa::Modify for WhyUtoipa {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if openapi.components.is_none() {
+            openapi.components = Some(Default::default());
+        }
+
+        let components = openapi.components.as_mut().unwrap();
+
+        let mut aaaa = Http::new(HttpAuthScheme::Bearer);
+        aaaa.bearer_format = Some("JWT".to_string());
+        aaaa.description = Some("Bearer token used for OAuth2".to_string());
+
+        components.add_security_scheme("bearerAuth", SecurityScheme::Http(aaaa));
+
+        let mut aaaaa = ApiKeyValue::new("BSESS");
+        aaaaa.description = Some("Session cookie used for authentication".to_string());
+        components.add_security_scheme("cookieAuth", SecurityScheme::ApiKey(ApiKey::Cookie(aaaaa)));
+    }
 }

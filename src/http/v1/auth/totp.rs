@@ -26,13 +26,15 @@ use crate::{
     http::{HttpResult, error::ApiError, v1::models},
 };
 
+use utoipa_axum::routes;
+
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
-        .route("/exchange", post(exchange))
-        .route("/enable", post(enable))
-        .route("/enable/exchange", post(enable_exchange))
-        .route("/recovery", post(recover_account))
-        .route("/disable", post(disable))
+        .routes(routes!(exchange))
+        .routes(routes!(enable))
+        .routes(routes!(enable_exchange))
+        .routes(routes!(recover_account))
+        .routes(routes!(disable))
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]

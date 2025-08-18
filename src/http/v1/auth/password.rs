@@ -32,10 +32,12 @@ use crate::{
     },
 };
 
+use utoipa_axum::routes;
+
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
-        .route("/login", post(login))
-        .route("/register", post(register))
+        .routes(routes!(login))
+        .routes(routes!(register))
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]

@@ -29,6 +29,8 @@ use crate::{
     http::{HttpResult, error::ApiError},
 };
 
+use utoipa_axum::routes;
+
 pub mod auth;
 pub mod models;
 pub mod oauth;
@@ -37,7 +39,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
         .nest("/auth", auth::routes())
         .nest("/oauth", oauth::routes())
-        .route("/user", get(get_user))
+        .routes(routes!(get_user))
 }
 
 #[utoipa::path(
@@ -48,7 +50,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
         (status = 401, description = "Unauthorized"),
         (status = 400, description = "Invalid request or login")
     ),
-    tag = "user"
+    tag = "general"
 )]
 async fn get_user(
     State(global): State<Arc<GlobalState>>,

@@ -1,3 +1,3 @@
+pub mod oauth;
 pub mod session;
 pub mod user;
-pub mod oauth;
