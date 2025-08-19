@@ -57,6 +57,12 @@ pub enum AuthEmails {
         app_name: String,
         scopes: String,
     },
+    TotpRecoveryViewed {
+        login: String,
+    },
+    TotpDisabled {
+        login: String,
+    },
 }
 
 impl EmailResource for AuthEmails {
@@ -119,6 +125,17 @@ impl EmailResource for AuthEmails {
                 //     "Hi there {login}, seems like you approved the Oauth app {app_name} with the following scopes: {scopes}.",
                 // )
             }
+            Self::TotpRecoveryViewed { login } => {
+                let now = chrono::Utc::now();
+                let date = now.format("%D").to_string();
+                let time = now.format("%H:%M").to_string();
+                context.insert("login", login);
+                context.insert("date", &date);
+                context.insert("time", &time);
+            }
+            Self::TotpDisabled { login } => {
+                context.insert("login", login);
+            }
         }
         context
     }
@@ -134,6 +151,8 @@ impl EmailResource for AuthEmails {
             Self::VerifyEmail { .. } => "verify_email.html",
             Self::EmailVerified { .. } => "email_verified.html",
             Self::OauthApproved { .. } => "oauth_app_authorized.html",
+            Self::TotpRecoveryViewed { .. } => "totp_recovery_viewed.html",
+            Self::TotpDisabled { .. } => "totp_disabled.html",
         }
     }
     fn subject(&self) -> String {
@@ -153,6 +172,12 @@ impl EmailResource for AuthEmails {
             }
             Self::OauthApproved { .. } => {
                 "[BeepAuth Account] A new OAuth app was authorized on your account".to_string()
+            }
+            Self::TotpRecoveryViewed { .. } => {
+                "[BeepAuth Account] Your Two-Factor recovery codes were viewed".to_string()
+            }
+            Self::TotpDisabled { .. } => {
+                "[BeepAuth Account] Your Two-Factor Authentication has been disabled".to_string()
             }
         }
     }

@@ -15,8 +15,8 @@ use crate::{
     auth::{
         middleware::AuthContext,
         ops::{
-            DeviceMetadata, TotpResponse, create_session, create_totp_exchange, get_totp_client,
-            remove_session, totp_secret,
+            DeviceMetadata, TotpResponse, create_session, create_totp_login_exchange,
+            get_totp_client, remove_session, totp_secret,
         },
     },
     database::{
@@ -110,7 +110,7 @@ async fn login(
         .map_err(|_| ApiError::InvalidLogin)?;
 
     if user.totp_secret.is_some() {
-        let response = create_totp_exchange(&user, &global.redis).await?;
+        let response = create_totp_login_exchange(&user, &global.redis).await?;
         return Ok(JsonEither::Right(response));
     }
 

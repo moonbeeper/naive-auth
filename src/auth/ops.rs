@@ -124,7 +124,7 @@ pub struct TotpResponse<'a> {
     pub link_id: FlowId,
 }
 
-pub async fn create_totp_exchange(
+pub async fn create_totp_login_exchange(
     user: &User,
     redis: &fred::clients::Pool,
 ) -> Result<TotpResponse<'static>, RedisError> {
@@ -134,15 +134,15 @@ pub async fn create_totp_exchange(
         secret: user.totp_secret.clone().unwrap(),
     }
     .store(
-        AuthFlowNamespace::TotpExchange,
+        AuthFlowNamespace::TotpLoginExchange,
         AuthFlowKey::FlowId(flow_id),
         redis,
     )
     .await?;
 
     Ok(TotpResponse {
-        error: ApiError::TotpIsRequired.into(),
-        message: ApiError::TotpIsRequired.to_string(),
+        error: ApiError::TOTPIsRequired.into(),
+        message: ApiError::TOTPIsRequired.to_string(),
         link_id: flow_id,
     })
 }

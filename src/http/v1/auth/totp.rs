@@ -16,7 +16,7 @@ use crate::{
         },
     },
     database::{
-        models::user::User,
+        models::{session::Session, user::User},
         redis::models::{
             FlowId,
             auth::{AuthFlow, AuthFlowKey, AuthFlowNamespace},
@@ -29,11 +29,11 @@ use crate::{
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
-        .routes(routes!(exchange))
+        .routes(routes!(exchange_login))
         .routes(routes!(enable))
         .routes(routes!(enable_exchange))
         .routes(routes!(recover_account))
-        .routes(routes!(disable))
+        .routes(routes!(exchange))
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
@@ -44,10 +44,10 @@ pub struct Exchange {
     code: String,
 }
 
-/// Exchange a Link ID to finalize a TOTP request
+/// Exchange a Link ID to finalize a TOTP login request
 #[utoipa::path(
     post,
-    path = "/exchange",
+    path = "/exchange-login",
     request_body = Exchange,
     responses(
         (status = 200, description = "Successful TOTP exchange", body = models::Session),
@@ -56,7 +56,7 @@ pub struct Exchange {
     ),
     tag = "totp"
 )]
-async fn exchange(
+async fn exchange_login(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
@@ -71,7 +71,7 @@ async fn exchange(
     }
 
     let flow = AuthFlow::get(
-        AuthFlowNamespace::TotpExchange,
+        AuthFlowNamespace::TotpLoginExchange,
         AuthFlowKey::FlowId(flow_id),
         &global.redis,
     )
@@ -124,6 +124,86 @@ async fn exchange(
     Err(ApiError::InvalidLogin)
 }
 
+/// Exchange a Link ID to finalize a TOTP request flow
+// TODO: this should really be focused on enabling sudo.
+#[utoipa::path(
+    post,
+    path = "/exchange",
+    request_body = Exchange,
+    responses(
+        (status = 200, description = "Successful TOTP exchange"),
+        (status = 400, description = "Invalid TOTP code or flow"),
+        (status = 401, description = "Not logged in"),
+    ),
+    tag = "totp"
+)]
+async fn exchange(
+    State(global): State<Arc<GlobalState>>,
+    Extension(session): Extension<AuthContext>,
+    cookies: Cookies,
+    Valid(Json(request)): Valid<Json<Exchange>>,
+) -> HttpResult<()> {
+    if !session.is_authenticated() {
+        return Err(ApiError::YouAreNotLoggedIn);
+    }
+
+    let Some(user) = User::get(session.user_id(), &global.database).await? else {
+        return Err(ApiError::InvalidLogin);
+    };
+    let flow_id: crate::database::ulid::Ulid = request.link_id;
+
+    if request.code.trim().is_empty() {
+        return Err(ApiError::InvalidTOTPCode(request.code));
+    }
+
+    let flow = AuthFlow::get(
+        AuthFlowNamespace::TotpExchange,
+        AuthFlowKey::UserFlow {
+            flow_id,
+            user_id: user.id,
+        },
+        &global.redis,
+    )
+    .await?;
+
+    if let Some(AuthFlow::TotpExchange { secret, .. }) = flow {
+        let totp = get_totp_client(&totp_rs::Secret::Encoded(secret));
+
+        if !totp.check_current(&request.code)? {
+            return Err(ApiError::InvalidTOTPCode(request.code));
+        }
+
+        AuthFlow::remove(
+            AuthFlowNamespace::TotpExchange,
+            AuthFlowKey::UserFlow {
+                flow_id,
+                user_id: user.id,
+            },
+            &global.redis,
+        )
+        .await?;
+
+        let Some(session) = Session::get(session.session_id(), &global.database).await? else {
+            remove_session(session, &cookies, &global).await?;
+            return Err(ApiError::InvalidLogin);
+        };
+
+        if session.is_sudo_enabled() {
+            return Ok(());
+        }
+
+        // should work alright because sudo only uses this lol
+        let mut tx = global.database.begin().await?;
+        session.enable_sudo(&mut tx).await?;
+        tx.commit().await?;
+
+        return Ok(());
+    }
+
+    // I don't really know what to return here. A error describing that the TOTP flow wasn't found or just this generic one
+    Err(ApiError::TOTPExchangeNotFound(flow_id.to_string()))
+}
+
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct EnableResponse {
     secret: String,
@@ -156,7 +236,7 @@ async fn enable(
     };
 
     if user.totp_secret.is_some() {
-        return Err(ApiError::TotpIsAlreadyEnabled);
+        return Err(ApiError::TOTPIsAlreadyEnabled);
     }
 
     let flow = AuthFlow::get(
@@ -234,7 +314,7 @@ async fn enable_exchange(
     };
 
     if user.totp_secret.is_some() {
-        return Err(ApiError::TotpIsAlreadyEnabled);
+        return Err(ApiError::TOTPIsAlreadyEnabled);
     }
 
     if request.code.trim().is_empty() {
@@ -282,7 +362,7 @@ async fn enable_exchange(
         return Ok(());
     }
 
-    Err(ApiError::TotpFlowNotFound)
+    Err(ApiError::TOTPFlowNotFound)
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
@@ -352,58 +432,4 @@ async fn recover_account(
 
     global.mailer.send(&user.email, mail).await?;
     Ok(Json(models::Session::from(sess.session)))
-}
-
-#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
-pub struct Disable {
-    #[validate(length(equal = 6))]
-    code: String,
-}
-
-/// Disable TOTP from this account
-#[utoipa::path(
-    post,
-    path = "/disable",
-    request_body = Disable,
-    responses(
-        (status = 200, description = "TOTP disabled successfully"),
-        (status = 400, description = "Invalid code or TOTP not enabled"),
-        (status = 401, description = "Not logged in")
-    ),
-    tag = "totp"
-)]
-async fn disable(
-    State(global): State<Arc<GlobalState>>,
-    Extension(session): Extension<AuthContext>,
-    cookies: Cookies,
-    Valid(Json(request)): Valid<Json<Disable>>,
-) -> HttpResult<()> {
-    if !session.is_authenticated() {
-        return Err(ApiError::YouAreNotLoggedIn);
-    }
-
-    let Some(user) = User::get(session.user_id(), &global.database).await? else {
-        remove_session(session, &cookies, &global).await?;
-        return Err(ApiError::InvalidLogin);
-    };
-    let mut mut_user = user.clone();
-
-    let Some(secret) = user.totp_secret else {
-        return Err(ApiError::TotpIsNotEnabled);
-    };
-
-    let totp = get_totp_client(&totp_rs::Secret::Encoded(secret));
-    if !totp.check_current(&request.code)? {
-        return Err(ApiError::InvalidTOTPCode(request.code));
-    }
-
-    mut_user.totp_secret = None;
-    mut_user.totp_recovery_secret = None;
-    mut_user.totp_recovery_codes = 0;
-
-    let mut tx = global.database.begin().await?;
-    mut_user.update(&mut tx).await?;
-    tx.commit().await?;
-
-    Ok(())
 }

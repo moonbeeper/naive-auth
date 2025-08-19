@@ -16,6 +16,9 @@ pub enum AuthFlow {
     OtpRecoverRequest {
         code: String,
     },
+    OtpExchange {
+        secret: String,
+    },
     TotpExchange {
         user_id: UserId,
         secret: String,
@@ -34,9 +37,11 @@ pub enum AuthFlow {
 
 pub enum AuthFlowNamespace {
     OtpAuth,
+    OtpExchange,
     // TotpUsed,
     TotpEnable,
     TotpExchange,
+    TotpLoginExchange,
     VerifyEmail,
 }
 
@@ -44,9 +49,11 @@ impl AuthFlowNamespace {
     pub const fn namespace(&self) -> &'static str {
         match self {
             Self::OtpAuth => "otp:auth",
+            Self::OtpExchange => "otp:exchange",
             // Self::TotpUsed => "totp:used",
             Self::TotpEnable => "totp:enable",
             Self::TotpExchange => "totp:exchange",
+            Self::TotpLoginExchange => "totp:login:exchange",
             Self::VerifyEmail => "verify:email",
         }
     }
@@ -56,6 +63,7 @@ impl AuthFlowNamespace {
 pub enum AuthFlowKey {
     OtpAuth { flow_id: FlowId, email: String },
     FlowId(FlowId),
+    UserFlow { flow_id: FlowId, user_id: UserId },
     UserId(UserId),
 }
 
@@ -65,6 +73,9 @@ impl Display for AuthFlowKey {
             Self::OtpAuth { flow_id, email } => write!(f, "{flow_id}:{email}"),
             Self::FlowId(ulid) => write!(f, "{ulid}"),
             Self::UserId(user_id) => write!(f, "{user_id}"), // Self::TotpUsed { user_id } => write!(f, "{user_id}"),
+            Self::UserFlow { flow_id, user_id } => {
+                write!(f, "{user_id}:{flow_id}")
+            }
         }
     }
 }
@@ -74,6 +85,7 @@ impl AuthFlow {
         match self {
             Self::OtpRegisterRequest { .. }
             | Self::OtpLoginRequest { .. }
+            | Self::OtpExchange { .. }
             | Self::TotpExchange { .. }
             | Self::OtpRecoverRequest { .. } => chrono::Duration::minutes(5),
             Self::TotpEnableRequest { .. } => chrono::Duration::minutes(10),

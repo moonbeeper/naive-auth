@@ -13,12 +13,14 @@ pub enum OauthFlow {
         redirect_uri: String,
         state: Option<String>,
         scopes: i64,
+        code_challenge: String, // I don't know if I should be storing it like this haha
     },
     TokenRequest {
         client_id: OauthAppId,
         redirect_uri: String,
         // code: String,
         scopes: i64,
+        code_challenge: String,
     },
 }
 

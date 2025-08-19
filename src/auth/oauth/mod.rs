@@ -36,8 +36,10 @@ pub enum OauthErrorKind {
     UnsupportedResponseType,
     #[error("The Client ID and/or Secret provided are invalid")]
     InvalidClient,
-    // #[error("please change me")]
-    // InvalidGrant, // unused
+    #[error(
+        "The provided authorization grant is invalid, expired, revoked, or was issued to another client."
+    )]
+    InvalidGrant, // unused
     #[error("We do not support this grant type")]
     UnsupportedGrantType,
     #[error(transparent)]
@@ -56,12 +58,15 @@ pub enum OauthErrorKind {
     FailedMakingUrl,
     #[error("The Authorize ID provided is invalid or does not exist on our papers")]
     InvalidAuthorizeId,
+    #[error("We do not support that code challenge using this method")]
+    UnsupportedCodeChallengeMethod,
 }
 
 pub struct OauthError {
     kind: OauthErrorKind,
     state: Option<String>,
     redirect_uri: Option<String>,
+    // iss: Option<String> I really can't figure out how to give it the issuer in the responses. Its optional tho
 }
 
 impl OauthError {
@@ -74,6 +79,10 @@ impl OauthError {
         self.redirect_uri = Some(redirect_uri);
         self
     }
+
+    // pub fn attach_iss(mut self, iss: String) -> Self {
+    //     self.iss = Some(iss);
+    // }
 }
 
 impl OauthErrorKind {
@@ -84,14 +93,15 @@ impl OauthErrorKind {
             Self::InvalidScope | Self::FailedParsingScopes(_) => "invalid_scope",
             Self::UnsupportedResponseType => "unsupported_response_type",
             Self::InvalidClient => "invalid_client",
-            // Self::InvalidGrant => "invalid_grant",
+            Self::InvalidGrant => "invalid_grant",
             Self::UnsupportedGrantType => "unsupported_grant_type",
             Self::ApiErrorTransparent(e) => e.into(),
             Self::InvalidExchangeId
             | Self::InvalidRequest
             | Self::InvalidRedirectUri
             | Self::FailedMakingUrl
-            | Self::InvalidAuthorizeId => "invalid_request",
+            | Self::InvalidAuthorizeId
+            | Self::UnsupportedCodeChallengeMethod => "invalid_request",
         }
     }
 
@@ -108,8 +118,9 @@ impl OauthErrorKind {
             | Self::InvalidRedirectUri
             | Self::FailedMakingUrl
             | Self::InvalidAuthorizeId
-            | Self::FailedParsingScopes(_) => axum::http::StatusCode::BAD_REQUEST, // dunno if these should be all 400
-            // Self::InvalidGrant => axum::http::StatusCode::BAD_REQUEST,
+            | Self::FailedParsingScopes(_)
+            | Self::UnsupportedCodeChallengeMethod
+            | Self::InvalidGrant => axum::http::StatusCode::BAD_REQUEST, // dunno if these should be all 400
             Self::ApiErrorTransparent(e) => e.status_code(),
         }
     }
@@ -194,7 +205,8 @@ impl IntoResponse for OauthError {
                 format!("{uri}?{query}")
             };
             if let Ok(uri) = Uri::try_from(redirect_url) {
-                return Redirect::temporary(uri.to_string().as_str()).into_response();
+                // https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-13#name-http-307-redirect
+                return Redirect::to(uri.to_string().as_str()).into_response();
             }
         }
         let status = self.kind.status();

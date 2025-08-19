@@ -21,3 +21,8 @@ Then you can just run the server with:
 ```sh
 cargo run
 ```
+
+## how to log in
+
+Simply log in via OTP if you don't want to have the hassle of going through the whole process of registering via password and then verifying your email address to be able to login. Here's a quick example:
+

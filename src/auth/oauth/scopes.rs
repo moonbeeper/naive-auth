@@ -35,3 +35,9 @@ impl Display for OauthScope {
         write!(f, "{string}")
     }
 }
+
+impl OauthScope {
+    pub fn as_vec(self) -> Vec<String> {
+        self.to_string().split(',').map(String::from).collect()
+    }
+}

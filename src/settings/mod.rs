@@ -12,6 +12,8 @@ pub struct HttpSettings {
     pub domain: String,
     #[default("http://localhost:8080")]
     pub origin: String,
+    #[default(true)]
+    pub swagger_ui: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]
@@ -102,7 +104,7 @@ pub struct LoggingSettings {
     pub format: LoggingSettingsFormat,
     #[default(true)]
     pub show_file_info: bool,
-    #[default(true)]
+    #[default(false)]
     pub show_thread_ids: bool,
     #[default(true)]
     pub show_line_numbers: bool,

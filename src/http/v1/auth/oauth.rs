@@ -7,6 +7,8 @@ use axum::{
     response::{IntoResponse as _, Redirect, Response},
 };
 use axum_valid::Valid;
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
+use sha2::{Digest, Sha256};
 use tower_cookies::Cookies;
 use url::Url;
 use utoipa::ToSchema;
@@ -55,6 +57,13 @@ pub enum OauthResponseType {
     Hybrid2,
 }
 
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, ToSchema)]
+pub enum CodeChallengeMethod {
+    S256,
+    #[serde(rename = "plain")]
+    Plain,
+}
+
 #[derive(Debug, serde::Deserialize, serde::Serialize, Validate, ToSchema, utoipa::IntoParams)]
 pub struct PreAuthorize {
     response_type: OauthResponseType,
@@ -64,11 +73,15 @@ pub struct PreAuthorize {
     redirect_uri: Option<String>,
     scope: Option<String>,
     state: Option<String>,
+    #[validate(length(equal = 43))]
+    code_challenge: String,
+    code_challenge_method: CodeChallengeMethod,
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct PreAuthorizeResponse {
     link_id: FlowId,
+    scopes: Vec<String>,
 }
 
 /// Get the Link ID to be able to authorize or refuse authorization for the OAuth client
@@ -93,6 +106,10 @@ async fn pre_authorize(
 
     if request.response_type != OauthResponseType::Code {
         return Err(OauthErrorKind::UnsupportedResponseType.into());
+    }
+
+    if request.code_challenge_method != CodeChallengeMethod::S256 {
+        return Err(OauthErrorKind::UnsupportedCodeChallengeMethod.into());
     }
 
     let Some(client) = OauthApp::get(&request.client_id, &global.database).await? else {
@@ -130,7 +147,8 @@ async fn pre_authorize(
                 redirect_uri,
                 requested_scopes.bits(),
                 request.state,
-                &global.redis,
+                request.code_challenge,
+                &global,
             )
             .await?
             .into_response())
@@ -147,11 +165,16 @@ async fn pre_authorize(
                 redirect_uri,
                 state: request.state,
                 scopes: requested_scopes.bits(),
+                code_challenge: request.code_challenge,
             }
             .store(flow_key, &global.redis)
             .await?;
 
-            Ok(Json(PreAuthorizeResponse { link_id: flow_id }).into_response())
+            Ok(Json(PreAuthorizeResponse {
+                link_id: flow_id,
+                scopes: requested_scopes.as_vec(),
+            })
+            .into_response())
         }
     }
 }
@@ -164,10 +187,10 @@ pub struct Authorize {
 }
 
 #[derive(Debug, serde::Serialize, Default, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum TokenType {
     #[default]
     Bearer,
-    #[serde(rename = "MAC")]
     _Mac, // never will use this
 }
 
@@ -176,6 +199,8 @@ pub struct AuthorizeResponse {
     code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     state: Option<String>,
+    // https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1-13#name-authorization-response
+    iss: String,
 }
 
 /// Exchange the Link ID to authorize or refuse authorizing a OAuth client
@@ -215,6 +240,7 @@ async fn authorize(
         redirect_uri,
         state,
         scopes: scope,
+        code_challenge,
     }) = flow
     {
         OauthFlow::remove(flow_key, &global.redis).await?;
@@ -231,11 +257,16 @@ async fn authorize(
 
             global.mailer.send(&user.email, email).await?;
 
-            Ok(
-                create_token_request(client.id, redirect_uri, scope, state, &global.redis)
-                    .await?
-                    .into_response(),
+            Ok(create_token_request(
+                client.id,
+                redirect_uri,
+                scope,
+                state,
+                code_challenge,
+                &global,
             )
+            .await?
+            .into_response())
         } else {
             Err(OauthErrorKind::AccessDenied.with_redirect(state, Some(redirect_uri)))
         }
@@ -261,12 +292,15 @@ pub struct ExchangeRequest {
     client_id: OauthAppId,
     #[validate(length(equal = 52))]
     client_secret: String,
+    #[validate(length(min = 43, max = 128))]
+    code_verifier: String,
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct ExchangeResponse {
     access_token: String,
     token_type: TokenType,
+    scope: String,
 }
 
 /// Exchange a code for a Bearer access token
@@ -296,9 +330,16 @@ async fn exchange(
         client_id,
         redirect_uri,
         scopes,
+        code_challenge,
     }) = flow
     {
         OauthFlow::remove(flow_key, &global.redis).await?;
+        let hashed_challenge =
+            BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(request.code_verifier.as_bytes()));
+
+        if hashed_challenge != code_challenge {
+            return Err(OauthErrorKind::InvalidGrant.into());
+        }
 
         if let Some(ref uri) = request.redirect_uri {
             validate_uri(uri, &redirect_uri)?;
@@ -334,10 +375,11 @@ async fn exchange(
         tx.commit().await?;
 
         let token = format!("{}_{token}", global.settings.oauth.token_prefix);
-
+        let scopes = OauthScope::from(scopes).to_string();
         return Ok(Json(ExchangeResponse {
             access_token: token,
             token_type: TokenType::Bearer,
+            scope: scopes,
         }));
     }
 
@@ -352,14 +394,37 @@ fn validate_uri(requested: &str, stored: &str) -> Result<(), OauthErrorKind> {
         return Err(OauthErrorKind::InvalidRedirectUri);
     }
 
-    if (stored.scheme() == requested.scheme()
+    if requested.fragment().is_some() {
+        return Err(OauthErrorKind::InvalidRedirectUri);
+    }
+
+    if is_localhost(&stored) && is_localhost(&requested) {
+        if stored.scheme() == requested.scheme()
+            && stored.host_str() == requested.host_str()
+            && stored.path() == requested.path()
+        {
+            return Ok(());
+        }
+    } else if (stored.scheme() == requested.scheme()
         || (requested.scheme() == "https" && stored.scheme() == "http"))
         && stored.host_str() == requested.host_str()
         && stored.path() == requested.path()
+        && stored.port_or_known_default() == requested.port_or_known_default()
     {
         return Ok(());
     }
+
     Err(OauthErrorKind::InvalidRedirectUri)
+}
+
+fn is_localhost(uri: &Url) -> bool {
+    match uri.host() {
+        // TODO: Should have ipv6?
+        Some(url::Host::Domain("localhost")) => true,
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        _ => false,
+    }
 }
 
 async fn create_token_request(
@@ -367,20 +432,23 @@ async fn create_token_request(
     redirect_uri: String,
     scopes: i64,
     state: Option<String>,
-    redis: &fred::clients::Pool,
+    code_challenge: String,
+    global: &Arc<GlobalState>,
 ) -> Result<Redirect, OauthError> {
     let code = StringId::new();
     OauthFlow::TokenRequest {
         client_id,
         redirect_uri: redirect_uri.clone(),
         scopes,
+        code_challenge,
     }
-    .store(OauthFlowKey::Code(code.clone()), redis)
+    .store(OauthFlowKey::Code(code.clone()), &global.redis)
     .await?;
 
     let query: String = serde_urlencoded::to_string(AuthorizeResponse {
         code: code.to_string(),
         state,
+        iss: global.settings.http.origin.clone(),
     })
     .unwrap_or_default();
 

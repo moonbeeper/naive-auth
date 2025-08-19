@@ -35,11 +35,11 @@ pub enum ApiError {
     #[error("Seems like {0} is not really a valid TOTP code")] // its just a copy of the otp err
     InvalidTOTPCode(String),
     #[error("2FA is enabled for this account")]
-    TotpIsRequired,
+    TOTPIsRequired,
     #[error("hi there, I am a teapot")]
     Teapot,
     #[error("2FA is already enabled on your account!")]
-    TotpIsAlreadyEnabled,
+    TOTPIsAlreadyEnabled,
     #[error("To do this you need to be logged in")]
     YouAreNotLoggedIn,
     #[error("The recovery code you provided is not valid: {0}")]
@@ -47,11 +47,11 @@ pub enum ApiError {
     #[error("You already used this recovery code: {0}")]
     UsedRecoveryCode(String),
     #[error("You need to enable 2FA first before you can disable it")]
-    TotpIsNotEnabled,
+    TOTPIsNotEnabled,
     #[error("Seems like the OTP recovery flow has expired or is invalid. Please retry again")]
     OTPRecoveryFlowNotFound,
     #[error("The TOTP flow wasn't found. Are you sure you invoked it?")]
-    TotpFlowNotFound,
+    TOTPFlowNotFound,
     #[error("Your email seems to not be verified. Check your inbox for the code!")]
     EmailIsNotVerified,
     #[error("Your email is already verified")]
@@ -72,6 +72,24 @@ pub enum ApiError {
     OAuthAppEmptyScopes,
     #[error("The OAuth authorization with ID {0} was not found")]
     OAuthAuthorizationNotFound(String),
+    #[error("Sudo is currently not enabled in this session")]
+    SudoIsNotEnabled,
+    #[error("Sudo is already enabled in this session")]
+    SudoIsAlreadyEnabled,
+    #[error("You cannot enable sudo with this option")]
+    SudoCannotBeEnabled,
+    #[error("The TOTP exchange flow with ID {0} was not found")]
+    TOTPExchangeNotFound(String),
+    #[error("The TOTP exchange flow with ID {0} was not found")]
+    OTPExchangeNotFound(String),
+    #[error("Are you sure that a session with ID {0} exists?")]
+    SessionDoesNotExist(String),
+    #[error("Somehow we failed to parse a URL: {0}")]
+    FailedParsingURL(#[from] url::ParseError),
+    #[error(
+        "The OAuth callback URL is invalid. Are you sure it doesn't contain a fragment in it (#)?"
+    )]
+    OAuthInvalidUri,
 }
 
 impl ApiError {
@@ -89,15 +107,15 @@ impl ApiError {
             Self::SystemTimeError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             Self::InvalidOTPCode(_) => axum::http::StatusCode::BAD_REQUEST,
             Self::InvalidTOTPCode(_) => axum::http::StatusCode::BAD_REQUEST,
-            Self::TotpIsRequired => axum::http::StatusCode::UNAUTHORIZED,
+            Self::TOTPIsRequired => axum::http::StatusCode::UNAUTHORIZED,
             Self::Teapot => axum::http::StatusCode::IM_A_TEAPOT,
-            Self::TotpIsAlreadyEnabled => axum::http::StatusCode::BAD_REQUEST,
+            Self::TOTPIsAlreadyEnabled => axum::http::StatusCode::BAD_REQUEST,
             Self::YouAreNotLoggedIn => axum::http::StatusCode::UNAUTHORIZED,
             Self::InvalidRecoveryCode(_) => axum::http::StatusCode::BAD_REQUEST,
             Self::UsedRecoveryCode(_) => axum::http::StatusCode::BAD_REQUEST,
-            Self::TotpIsNotEnabled => axum::http::StatusCode::BAD_REQUEST,
+            Self::TOTPIsNotEnabled => axum::http::StatusCode::BAD_REQUEST,
             Self::OTPRecoveryFlowNotFound => axum::http::StatusCode::NOT_FOUND,
-            Self::TotpFlowNotFound => axum::http::StatusCode::NOT_FOUND,
+            Self::TOTPFlowNotFound => axum::http::StatusCode::NOT_FOUND,
             Self::EmailIsNotVerified => axum::http::StatusCode::UNAUTHORIZED,
             Self::EmailIsAlreadyVerified => axum::http::StatusCode::BAD_REQUEST,
             Self::InvalidEmailVerification => axum::http::StatusCode::BAD_REQUEST,
@@ -107,6 +125,14 @@ impl ApiError {
             Self::OAuthAppNotOwned(_) => axum::http::StatusCode::BAD_REQUEST,
             Self::OAuthAppEmptyScopes => axum::http::StatusCode::BAD_REQUEST,
             Self::OAuthAuthorizationNotFound(_) => axum::http::StatusCode::NOT_FOUND,
+            Self::SudoIsNotEnabled => axum::http::StatusCode::UNAUTHORIZED,
+            Self::SudoIsAlreadyEnabled => axum::http::StatusCode::BAD_REQUEST,
+            Self::SudoCannotBeEnabled => axum::http::StatusCode::BAD_REQUEST,
+            Self::TOTPExchangeNotFound(_) => axum::http::StatusCode::NOT_FOUND,
+            Self::OTPExchangeNotFound(_) => axum::http::StatusCode::NOT_FOUND,
+            Self::SessionDoesNotExist(_) => axum::http::StatusCode::NOT_FOUND,
+            Self::FailedParsingURL(_) => axum::http::StatusCode::BAD_REQUEST,
+            Self::OAuthInvalidUri => axum::http::StatusCode::BAD_REQUEST,
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::State, routing::get};
+use axum::{Extension, Json, extract::State};
 use axum_valid::Valid;
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
@@ -10,12 +10,12 @@ use validator::Validate;
 use crate::{
     auth::{middleware::AuthContext, ops::remove_session},
     database::{
-        models::{session::Session, user::User},
+        models::user::User,
         redis::models::auth::{AuthFlow, AuthFlowKey, AuthFlowNamespace},
     },
     email::resources::AuthEmails,
     global::GlobalState,
-    http::{HttpResult, error::ApiError, v1::models},
+    http::{HttpResult, error::ApiError},
 };
 
 pub mod oauth;
@@ -25,77 +25,13 @@ pub mod totp;
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
-        .route("/", get(index))
         .merge(password::routes())
         .nest("/otp", otp::routes())
         .nest("/totp", totp::routes())
-        .routes(routes!(current_session))
-        .routes(routes!(list_sessions))
+        .nest("/oauth", oauth::routes())
         .routes(routes!(verify_email))
         .routes(routes!(get_recovery_options))
         .routes(routes!(signout))
-        .nest("/oauth", oauth::routes())
-}
-
-async fn index() -> &'static str {
-    "Hello, World!"
-}
-
-/// Get the current session
-#[utoipa::path(
-    get,
-    path = "/current",
-    responses(
-        (status = 200, description = "Current session", body = models::Session),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Invalid login or session")
-    ),
-    tag = "auth"
-)]
-async fn current_session(
-    State(global): State<Arc<GlobalState>>,
-    cookies: Cookies,
-    Extension(auth_context): Extension<AuthContext>,
-) -> HttpResult<Json<models::Session>> {
-    if !auth_context.is_authenticated() {
-        return Err(ApiError::YouAreNotLoggedIn);
-    }
-
-    let Some(session) = Session::get(auth_context.session_id(), &global.database).await? else {
-        remove_session(auth_context, &cookies, &global).await?;
-        return Err(ApiError::InvalidLogin);
-    };
-
-    Ok(Json(models::Session::from(session)))
-}
-
-/// Get all the open sessions of the user
-#[utoipa::path(
-    get,
-    path = "/sessions",
-    responses(
-        (status = 200, description = "List of sessions", body = Vec<models::Session>),
-        (status = 401, description = "Not authenticated"),
-    ),
-    tag = "auth"
-)]
-async fn list_sessions(
-    State(global): State<Arc<GlobalState>>,
-    Extension(auth_context): Extension<AuthContext>,
-) -> HttpResult<Json<Vec<models::Session>>> {
-    if !auth_context.is_authenticated() {
-        return Err(ApiError::YouAreNotLoggedIn);
-    }
-
-    let sessions = Session::list_user_sessions(auth_context.user_id(), &global.database).await?;
-
-    if sessions.is_empty() {
-        return Ok(Json(vec![]));
-    }
-
-    let sessions: Vec<models::Session> = sessions.into_iter().map(models::Session::from).collect();
-
-    Ok(Json(sessions))
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
@@ -168,9 +104,9 @@ async fn verify_email(
 
 #[derive(Debug, serde::Serialize, ToSchema)]
 
-pub struct RecoveryOptions {
-    otp: bool,
-    totp: bool,
+pub struct CurrentActiveOptions {
+    pub otp: bool,
+    pub totp: bool,
 }
 
 /// Get the available recovery options for an user. (placeholder?)
@@ -178,9 +114,8 @@ pub struct RecoveryOptions {
     get,
     path = "/recovery-options",
     responses(
-        (status = 200, description = "Recovery options", body = RecoveryOptions),
+        (status = 200, description = "Recovery options", body = CurrentActiveOptions),
         (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Invalid login")
     ),
     tag = "auth"
 )]
@@ -188,7 +123,7 @@ async fn get_recovery_options(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
-) -> HttpResult<Json<RecoveryOptions>> {
+) -> HttpResult<Json<CurrentActiveOptions>> {
     if !auth_context.is_authenticated() {
         return Err(ApiError::YouAreNotLoggedIn);
     }
@@ -198,7 +133,7 @@ async fn get_recovery_options(
         return Err(ApiError::InvalidLogin);
     };
 
-    let options = RecoveryOptions {
+    let options = CurrentActiveOptions {
         otp: true,
         totp: user.totp_secret.is_some(),
     };

@@ -8,6 +8,7 @@ use axum::{
 use axum_valid::Valid;
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
+use url::Url;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use validator::Validate;
@@ -99,6 +100,10 @@ async fn create_app(
 
     let token = create_token();
     let id = StringId::new();
+    let uri = Url::parse(&request.callback_url)?;
+    if uri.fragment().is_some() {
+        return Err(ApiError::OAuthInvalidUri);
+    }
 
     let argon2 = Argon2::default();
     let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());

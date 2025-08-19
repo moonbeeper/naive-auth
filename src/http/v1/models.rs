@@ -18,6 +18,8 @@ pub struct Session {
     pub name: String,
     pub active_expires_at: chrono::DateTime<chrono::Utc>,
     pub inactive_expires_at: chrono::DateTime<chrono::Utc>,
+    pub os: String,
+    pub browser: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -28,6 +30,8 @@ impl From<database::models::session::Session> for Session {
             name: value.name,
             active_expires_at: value.active_expires_at,
             inactive_expires_at: value.inactive_expires_at,
+            os: value.os,
+            browser: value.browser,
             created_at: value.created_at,
         }
     }
@@ -116,13 +120,28 @@ impl From<database::models::oauth::OauthAuthorized> for OauthAuthorized {
             id: value.id,
             app: value.app,
             user_id: value.user_id,
-            scopes: OauthScope::from(value.scopes)
-                .to_string()
-                .split(',')
-                .map(String::from)
-                .collect(),
+            scopes: OauthScope::from(value.scopes).as_vec(),
             created_at: value.created_at,
             updated_at: value.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct TinySession {
+    pub id: SessionId,
+    pub name: String,
+    pub active_expires_at: chrono::DateTime<chrono::Utc>,
+    pub os: String,
+}
+
+impl From<database::models::session::Session> for TinySession {
+    fn from(value: database::models::session::Session) -> Self {
+        Self {
+            id: value.id,
+            name: value.name,
+            active_expires_at: value.active_expires_at,
+            os: value.os,
         }
     }
 }

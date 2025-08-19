@@ -11,12 +11,12 @@ use crate::{
     auth::{
         middleware::AuthContext,
         ops::{
-            DeviceMetadata, TotpResponse, create_session, create_totp_exchange, get_totp_client,
-            remove_session, totp_secret,
+            DeviceMetadata, TotpResponse, create_session, create_totp_login_exchange,
+            get_totp_client, remove_session, totp_secret,
         },
     },
     database::{
-        models::user::User,
+        models::{session::Session, user::User},
         redis::models::{
             FlowId,
             auth::{AuthFlow, AuthFlowKey, AuthFlowNamespace},
@@ -34,9 +34,10 @@ use crate::{
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
         .routes(routes!(login))
-        .routes(routes!(exchange))
+        .routes(routes!(exchange_login))
         .routes(routes!(recover_account))
         .routes(routes!(recover_account_exchange))
+        .routes(routes!(exchange))
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
@@ -168,7 +169,7 @@ pub struct AuthExchange {
 /// Exchange the OTP code sent to the user's email for a session
 #[utoipa::path(
     post,
-    path = "/exchange",
+    path = "/exchange-login",
     request_body = AuthExchange,
     responses(
         (status = 200, description = "Exchanged for session or TOTP challenge", body = JsonEither<models::Session, TotpResponse>),
@@ -176,7 +177,7 @@ pub struct AuthExchange {
     ),
     tag = "otp"
 )]
-async fn exchange(
+async fn exchange_login(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
@@ -222,7 +223,7 @@ async fn exchange(
         .await?;
 
         if user.totp_secret.is_some() {
-            let response = create_totp_exchange(&user, &global.redis).await?;
+            let response = create_totp_login_exchange(&user, &global.redis).await?;
             return Ok(JsonEither::Right(response));
         }
 
@@ -297,13 +298,88 @@ async fn exchange(
     Err(ApiError::InvalidLogin)
 }
 
+/// Exchange the OTP code sent to the user's email to finish a otp exchange flow
+// TODO: this should really be focused on enabling sudo.
+#[utoipa::path(
+    post,
+    path = "/exchange",
+    request_body = AuthExchange,
+    responses(
+        (status = 200, description = "Successful OTP exchange"),
+        (status = 400, description = "Invalid code or login"),
+    ),
+    tag = "otp"
+)]
+async fn exchange(
+    State(global): State<Arc<GlobalState>>,
+    Extension(session): Extension<AuthContext>,
+    cookies: Cookies,
+    Valid(Json(request)): Valid<Json<AuthExchange>>,
+) -> HttpResult<()> {
+    if !session.is_authenticated() {
+        return Err(ApiError::YouAreNotLoggedIn);
+    }
+
+    let Some(user) = User::get(session.user_id(), &global.database).await? else {
+        return Err(ApiError::InvalidLogin);
+    };
+
+    if request.code.trim().is_empty() {
+        return Err(ApiError::InvalidOTPCode(request.code));
+    }
+
+    let flow = AuthFlow::get(
+        AuthFlowNamespace::OtpExchange,
+        AuthFlowKey::UserFlow {
+            flow_id: request.link_id,
+            user_id: user.id,
+        },
+        &global.redis,
+    )
+    .await?;
+
+    if let Some(AuthFlow::OtpExchange { secret }) = flow {
+        let totp = get_totp_client(&totp_rs::Secret::Encoded(secret.clone()));
+        if !totp.check_current(&request.code)? {
+            return Err(ApiError::InvalidOTPCode(request.code));
+        }
+
+        AuthFlow::remove(
+            AuthFlowNamespace::OtpExchange,
+            AuthFlowKey::UserFlow {
+                flow_id: request.link_id,
+                user_id: user.id,
+            },
+            &global.redis,
+        )
+        .await?;
+
+        let Some(session) = Session::get(session.session_id(), &global.database).await? else {
+            remove_session(session, &cookies, &global).await?;
+            return Err(ApiError::InvalidLogin);
+        };
+
+        if session.is_sudo_enabled() {
+            return Ok(());
+        }
+        // should work alright because sudo only uses this lol
+        let mut tx = global.database.begin().await?;
+        session.enable_sudo(&mut tx).await?;
+        tx.commit().await?;
+
+        return Ok(());
+    }
+
+    Err(ApiError::OTPExchangeNotFound(request.link_id.to_string()))
+}
+
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct RecoverAccount {
     #[validate(email)]
     email: String,
 }
 
-/// Recover an account via an OTP code sent to the user's email
+/// Recover an account via an OTP code sent to the user's email (this is actually a copy of the login one?)
 #[utoipa::path(
     post,
     path = "/recover",

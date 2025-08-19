@@ -25,11 +25,17 @@ use crate::{
 pub mod auth;
 pub mod models;
 pub mod oauth;
+mod session;
+mod sudo;
+mod totp;
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
         .nest("/auth", auth::routes())
         .nest("/oauth", oauth::routes())
+        .nest("/totp", totp::routes())
+        .nest("/session", session::routes())
+        .nest("/sudo", sudo::routes())
         .routes(routes!(get_user))
 }
 

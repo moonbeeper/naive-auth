@@ -16,7 +16,7 @@ pub fn run() -> anyhow::Result<()> {
     let args = Args::parse();
     if args.generate {
         Settings::create_settings_file()?;
-        tracing::info!(
+        println!(
             "Settings file created successfully! Check it out before running the app again :)"
         );
         std::process::exit(0);

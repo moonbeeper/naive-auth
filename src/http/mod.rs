@@ -33,10 +33,11 @@ pub type HttpResult<T> = Result<T, error::ApiError>;
     modifiers(&WhyUtoipa),
     tags(
         (name = "auth", description = "General authentication endpoints"),
-        (name = "oauth", description = "OAuth2 endpoints"),
-        (name = "totp", description = "TOTP endpoints"),
+        (name = "oauth", description = "OAuth2 related endpoints"),
+        (name = "totp", description = "TOTP related endpoints"),
         (name = "password", description = "Password Authentication endpoints"),
         (name = "otp", description = "One-Time Passcode Authentication endpoints"),
+        (name = "session", description = "Session related endpoints"),
         (name = "default", description = "Uncategorized"),
     )
 )]
@@ -68,10 +69,15 @@ pub async fn run(
 
     socket.bind(global.settings.http.bind)?;
     let listener = socket.listen(1024)?;
+    
     let router = routes(&global).split_for_parts();
-    let router = router
-        .0
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", router.1.clone()));
+    let router = if global.settings.http.swagger_ui {
+        router
+            .0
+            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", router.1.clone()))
+    } else {
+        router.0
+    };
 
     axum::serve(listener, router)
         .with_graceful_shutdown(async move { _ = shutdown_signal.await })
