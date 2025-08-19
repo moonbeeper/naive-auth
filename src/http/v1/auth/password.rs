@@ -3,7 +3,7 @@ use std::sync::Arc;
 use argon2::{
     Argon2, PasswordHash, PasswordHasher as _, PasswordVerifier as _, password_hash::SaltString,
 };
-use axum::{Extension, Json, extract::State};
+use axum::{Extension, Json, extract::State, http::HeaderMap};
 use axum_valid::Valid;
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
@@ -15,8 +15,8 @@ use crate::{
     auth::{
         middleware::AuthContext,
         ops::{
-            TotpResponse, create_session, create_totp_exchange, get_totp_client, remove_session,
-            totp_secret,
+            DeviceMetadata, TotpResponse, create_session, create_totp_exchange, get_totp_client,
+            remove_session, totp_secret,
         },
     },
     database::{
@@ -31,7 +31,6 @@ use crate::{
         v1::{JsonEither, models},
     },
 };
-
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
@@ -62,6 +61,7 @@ async fn login(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
+    headers: HeaderMap,
     Valid(Json(request)): Valid<Json<LoginPassword>>,
 ) -> HttpResult<JsonEither<models::Session, TotpResponse<'static>>> {
     remove_session(session, &cookies, &global).await?; // force logout
@@ -99,6 +99,8 @@ async fn login(
         Err(ApiError::InvalidLogin)?;
     }
 
+    let metadata = DeviceMetadata::from_headers(&headers);
+
     let argon2 = Argon2::default();
     argon2
         .verify_password(
@@ -112,7 +114,7 @@ async fn login(
         return Ok(JsonEither::Right(response));
     }
 
-    let sess = create_session("temporary".into(), &user, &global.settings)?;
+    let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
 
     let mut tx = global.database.begin().await?;
     sess.session.insert(&mut tx).await?;
@@ -121,7 +123,7 @@ async fn login(
     cookies.add(sess.cookie);
     global
         .mailer
-        .send(&user.email, AuthEmails::NewLogin { login })
+        .send(&user.email, AuthEmails::NewLogin { login, metadata })
         .await?;
 
     Ok(JsonEither::Left(models::Session::from(sess.session)))
@@ -143,7 +145,7 @@ pub struct RegisterPassword {
     path = "/register",
     request_body = RegisterPassword,
     responses(
-        (status = 200, description = "Account registered, session returned", body = models::Session),
+        (status = 200, description = "Account registered, verify your email lol"),
         (status = 400, description = "Invalid input or already exists"),
     ),
     tag = "password"
@@ -153,10 +155,10 @@ async fn register(
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
     Valid(Json(request)): Valid<Json<RegisterPassword>>,
-) -> HttpResult<Json<models::Session>> {
+) -> HttpResult<()> {
     remove_session(session, &cookies, &global).await?; // force logout
 
-    if User::get_by_email(&request.email, &global.database)
+    if User::get_by_email_or_login(&request.email, &request.login, &global.database)
         .await?
         .is_some()
     {
@@ -178,13 +180,28 @@ async fn register(
         .password_hash(password_hash)
         .build();
 
-    let sess = create_session("temporary".into(), &user, &global.settings)?;
+    // let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
 
     let mut tx = global.database.begin().await?;
     user.insert(&mut tx).await?;
-    sess.session.insert(&mut tx).await?;
+    // sess.session.insert(&mut tx).await?;
     tx.commit().await?;
 
-    cookies.add(sess.cookie);
-    Ok(Json(models::Session::from(sess.session)))
+    let code = get_totp_client(&totp_secret().to_encoded()).generate_current()?;
+    AuthFlow::VerifyEmail { code: code.clone() }
+        .store(
+            AuthFlowNamespace::VerifyEmail,
+            AuthFlowKey::UserId(user.id),
+            &global.redis,
+        )
+        .await?;
+
+    let mail = AuthEmails::VerifyEmail {
+        login: user.login,
+        code,
+    };
+    global.mailer.send(&user.email, mail).await?;
+
+    // cookies.add(sess.cookie);
+    Ok(())
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::State};
+use axum::{Extension, Json, extract::State, http::HeaderMap};
 use axum_valid::Valid;
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
@@ -11,8 +11,8 @@ use crate::{
     auth::{
         middleware::AuthContext,
         ops::{
-            TotpResponse, create_session, create_totp_exchange, get_totp_client, remove_session,
-            totp_secret,
+            DeviceMetadata, TotpResponse, create_session, create_totp_exchange, get_totp_client,
+            remove_session, totp_secret,
         },
     },
     database::{
@@ -180,6 +180,7 @@ async fn exchange(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
+    headers: HeaderMap,
     Valid(Json(request)): Valid<Json<AuthExchange>>,
 ) -> HttpResult<JsonEither<models::Session, TotpResponse<'static>>> {
     remove_session(session, &cookies, &global).await?; // force logout
@@ -197,6 +198,8 @@ async fn exchange(
         &global.redis,
     )
     .await?;
+
+    let metadata = DeviceMetadata::from_headers(&headers);
 
     if let Some(AuthFlow::OtpLoginRequest { secret }) = flow {
         let Some(user) = User::get_by_email(&request.email, &global.database).await? else {
@@ -223,7 +226,7 @@ async fn exchange(
             return Ok(JsonEither::Right(response));
         }
 
-        let sess = create_session("temporary".into(), &user, &global.settings)?;
+        let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
 
         let mut tx = global.database.begin().await?;
         sess.session.insert(&mut tx).await?;
@@ -232,7 +235,13 @@ async fn exchange(
         cookies.add(sess.cookie);
         global
             .mailer
-            .send(&user.email, AuthEmails::NewLogin { login: user.login })
+            .send(
+                &user.email,
+                AuthEmails::NewLogin {
+                    login: user.login,
+                    metadata,
+                },
+            )
             .await?;
 
         return Ok(JsonEither::Left(models::Session::from(sess.session)));
@@ -263,7 +272,7 @@ async fn exchange(
             .email_verified(true)
             .build();
 
-        let sess = create_session("temporary".into(), &user, &global.settings)?;
+        let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
 
         let mut tx = global.database.begin().await?;
         user.insert(&mut tx).await?;
@@ -273,7 +282,13 @@ async fn exchange(
         cookies.add(sess.cookie);
         global
             .mailer
-            .send(&user.email, AuthEmails::NewLogin { login: user.login })
+            .send(
+                &user.email,
+                AuthEmails::NewLogin {
+                    login: user.login,
+                    metadata,
+                },
+            )
             .await?;
 
         return Ok(JsonEither::Left(models::Session::from(sess.session)));
@@ -313,13 +328,20 @@ async fn recover_account(
 
     if !user.email_verified {
         let code = get_totp_client(&totp_secret().to_encoded()).generate_current()?;
-        AuthFlow::VerifyEmail { code }
+        AuthFlow::VerifyEmail { code: code.clone() }
             .store(
                 AuthFlowNamespace::VerifyEmail,
                 AuthFlowKey::UserId(user.id),
                 &global.redis,
             )
             .await?;
+
+        let mail = AuthEmails::VerifyEmail {
+            login: user.login,
+            code,
+        };
+
+        global.mailer.send(&user.email, mail).await?;
 
         return Err(ApiError::EmailIsNotVerified);
     }
@@ -370,6 +392,7 @@ async fn recover_account_exchange(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
+    headers: HeaderMap,
     Valid(Json(request)): Valid<Json<RecoverAccountExchange>>,
 ) -> HttpResult<Json<models::Session>> {
     remove_session(session, &cookies, &global).await?; // force logout
@@ -389,6 +412,8 @@ async fn recover_account_exchange(
     )
     .await?;
 
+    let metadata = DeviceMetadata::from_headers(&headers);
+
     if let Some(AuthFlow::OtpRecoverRequest { code }) = flow {
         if code != request.code {
             return Err(ApiError::InvalidRecoveryCode(request.code));
@@ -399,7 +424,8 @@ async fn recover_account_exchange(
             &global.redis,
         )
         .await?;
-        let sess = create_session("temporary".into(), &user, &global.settings)?;
+
+        let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
 
         let mut tx = global.database.begin().await?;
         sess.session.insert(&mut tx).await?;
@@ -408,7 +434,13 @@ async fn recover_account_exchange(
         cookies.add(sess.cookie);
         global
             .mailer
-            .send(&user.email, AuthEmails::NewLogin { login: user.login })
+            .send(
+                &user.email,
+                AuthEmails::NewLogin {
+                    login: user.login,
+                    metadata,
+                },
+            )
             .await?;
 
         return Ok(Json(models::Session::from(sess.session)));

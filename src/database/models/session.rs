@@ -13,6 +13,8 @@ pub struct Session {
     pub name: String,
     pub active_expires_at: chrono::DateTime<chrono::Utc>,
     pub inactive_expires_at: chrono::DateTime<chrono::Utc>,
+    pub os: String,
+    pub browser: String,
     // omg the builder default messes somehow with the fields when fetching from the database, making it return the
     // default value instead of the actual value.
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -24,15 +26,17 @@ impl Session {
         sqlx::query!(
             "
             insert into
-                sessions (id, user_id, name, active_expires_at, inactive_expires_at, updated_at, created_at)
+                sessions (id, user_id, name, active_expires_at, inactive_expires_at, os, browser, updated_at, created_at)
             values
-                ($1, $2, $3, $4, $5, now(), now())
+                ($1, $2, $3, $4, $5, $6, $7, now(), now())
             ",
             self.id as SessionId,
             self.user_id as UserId,
             self.name,
             self.active_expires_at,
-            self.inactive_expires_at
+            self.inactive_expires_at,
+            self.os,
+            self.browser,
         )
         .execute(&mut **transaction)
         .await?;
@@ -63,13 +67,17 @@ impl Session {
                     name = $2,
                     active_expires_at = $3,
                     inactive_expires_at = $4,
+                    os = $5,
+                    browser = $6,
                     updated_at = now()
-            where id = $5
+            where id = $7
             ",
             self.user_id as UserId,
             self.name,
             self.active_expires_at,
             self.inactive_expires_at,
+            self.os,
+            self.browser,
             self.id as SessionId,
         )
         .execute(&mut **transaction)
@@ -100,7 +108,22 @@ impl Session {
         // why does the update and created at fields just return the default time!?
         let sessions = sqlx::query_as!(
             Session,
-            "select id, user_id, name, active_expires_at, inactive_expires_at, created_at, updated_at from sessions where user_id = $1 order by created_at desc limit 100",
+            "
+            select
+                id,
+                user_id,
+                name,
+                active_expires_at,
+                inactive_expires_at,
+                os,
+                browser,
+                created_at,
+                updated_at
+            from sessions
+            where user_id = $1
+            order by created_at desc
+            limit 100
+            ",
             id as UserId
         )
         .fetch_all(executor)
@@ -119,3 +142,5 @@ impl Session {
         chrono::Utc::now() <= self.active_expires_at
     }
 }
+
+

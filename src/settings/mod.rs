@@ -93,6 +93,29 @@ pub struct OauthSettings {
     pub token_prefix: String,
 }
 
+#[derive(serde::Deserialize, serde::Serialize, Debug, SmartDefault)]
+pub struct LoggingSettings {
+    #[default(true)]
+    pub enabled: bool,
+    #[default("info")]
+    pub level: String,
+    pub format: LoggingSettingsFormat,
+    #[default(true)]
+    pub show_file_info: bool,
+    #[default(true)]
+    pub show_thread_ids: bool,
+    #[default(true)]
+    pub show_line_numbers: bool,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug, Default)]
+pub enum LoggingSettingsFormat {
+    #[default]
+    Normal,
+    Pretty,
+    Compact,
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub struct Settings {
     pub http: HttpSettings,
@@ -102,6 +125,7 @@ pub struct Settings {
     pub redis: RedisSettings,
     // pub secrets: AuthSecrets,
     pub oauth: OauthSettings,
+    pub logging: LoggingSettings,
 }
 
 impl Settings {

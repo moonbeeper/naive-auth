@@ -114,6 +114,26 @@ impl User {
         Ok(user)
     }
 
+    pub async fn get_by_email_or_login<'a, E>(
+        email: &str,
+        login: &str,
+        executor: E,
+    ) -> DatabaseError<Option<Self>>
+    where
+        E: PgExecutor<'a> + Copy,
+    {
+        let email = Self::get_by_email(email, executor).await?;
+        let login = Self::get_by_login(login, executor).await?;
+
+        if email.is_some() {
+            return Ok(email);
+        } else if login.is_some() {
+            return Ok(login);
+        }
+
+        Ok(None)
+    }
+
     pub async fn get<'a, E>(id: UserId, executor: E) -> DatabaseError<Option<Self>>
     where
         E: PgExecutor<'a>,

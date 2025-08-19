@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <div
+      style="
+        background-color: #000000;
+        color: #ffffff;
+        font-family: 'Iowan Old Style', 'Palatino Linotype', 'URW Palladio L',
+          P052, serif;
+        font-size: 16px;
+        font-weight: 400;
+        letter-spacing: 0.15008px;
+        line-height: 1.5;
+        margin: 0;
+        padding: 32px 0;
+        min-height: 100%;
+        width: 100%;
+      "
+    >
+      <table
+        align="center"
+        width="100%"
+        style="margin: 0 auto; max-width: 600px; background-color: #000000"
+        role="presentation"
+        cellspacing="0"
+        cellpadding="0"
+        border="0"
+      >
+        <tbody>
+          <tr style="width: 100%">
+            <td>
+              <div style="padding: 24px 24px 16px 24px; text-align: left">
+                <img
+                  alt="BeepAuth Logo"
+                  src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAQAAABpN6lAAAAAAXNSR0IArs4c6QAAA5BJREFUeJztnN2SpCAMhXVrX3n6IZyHZi+63EYhkMAJATvf1dSIJDmEPxvdNsdxHMdxHMdxHMdxvo19lKEQSBeG+ZC1rlMtHS6NjRBgoy2Bp4yUAmYKE/qHUSKIzcSBnk6ig7/WrovQiE6oFCMkEJkYG/42RAKBgfHhbwMk+MMtaBO+Pkx9LcPXzQF2BjyVv5xCyPbXnTrlsNKr3VlO+tZr1+wErAyQI3HZNicUxoB9b2sxm80QIwMkLWO7tW0B1gU0Qw9Br3ZIF2hN+rQeRC0yOjJgvXTP8fULoWYBntH+ngFaC6E26Ak3fwWRhUtnQAj9q8dpMqA1lPd97bkwRQb0t2T7/RMIgNkEtdZiLgBuD9hWk7EA2C1wS22mAuCfAMhrNBRgjodi5mMAGqmszQLM0X79TLMQorkvcrDSTysAvbZ7XyntGyTrwknHgHoIqO04QwDKlN4owAuOLiXxzDADqADGPmox7QJpqKjHq3y6BOjvBNdwpcEjxGLNAvtu3d/16OwC1suhfvkmnQbHwRQAM+XMiGcAt+CcOdBvG5IBK3cDgQDWE5YOoDFg3RwQCTBbDiBkBx6WHisPypOu4/I9hnuotbzED+gToRD0RYC/mKHhgpYItOVX9Peh2wXKjvyvVkGCvNVX5n+/Vl3gA/pgWy74e+gHIUeZRjc5PRElQWorF3p8bUAGaD4iiam1/JFeFoXf9docYjLKvYNG118LnW83Ki0pfKdHgty9n/L3q6Wkl1jNlJYU/kmcLjlSciYEevwuB1+zqCZAGjzPodQdqqa0TmnotM1CWV6xt9NXF7juxe7cg7+P3xT84FOblZK8Yj8h5wRPgrcz19DpgCS9nUZBgJIjadvFpff9Gn5bSDLgAtRG/Fz6HsnVEaGfcCUACRCTztav6O9RGAqwVTvFCLgCKP0ucAwP+A63wZQy4MSi958wj1lwq7sLMGo71I6yACvAkQDw09ja+I+j1g5owum2jxaAw+RfkemnNnZ9fQY8TgDp0eqHCSCfrB8lQMtaZepvifEpfYekLMu07wtw6f0Ey9IC7JmH6Lkyxesyk7N2AQrGixfSKleSALobXA/enPBYAbhT4tKDIIXZISksLROcfCmkckgKwfl2YO0twbh0kx35LewHzh3ny+N7NT+kZXhMboYDlxteAJnr8pU7HuA5wTWfG4NmgTWD3zDnBNcN3nEcx3Ecx3Ecx3G+lH9Cmf7fIS4v3AAAAABJRU5ErkJggg=="
+                  height="42"
+                  style="
+                    height: 42px;
+                    outline: none;
+                    border: none;
+                    text-decoration: none;
+                    vertical-align: middle;
+                    display: inline-block;
+                    max-width: 100%;
+                  "
+                />
+              </div>
+              <h2
+                style="
+                  font-weight: bold;
+                  margin: 0;
+                  font-size: 24px;
+                  padding: 16px 24px 16px 24px;
+                "
+              >
+                Hi {{ login }},
+              </h2>
+              <div
+                style="
+                  color: #ffffff;
+                  font-size: 16px;
+                  font-weight: normal;
+                  text-align: center;
+                  padding: 16px 24px 16px 24px;
+                "
+              >
+                Here&#x27;s your one-time passcode{% if recovery %} to recover
+                your account {% endif %}:
+              </div>
+              <h1
+                style="
+                  font-weight: bold;
+                  text-align: center;
+                  margin: 0;
+                  font-family: 'Nimbus Mono PS', 'Courier New', 'Cutive Mono',
+                    monospace;
+                  font-size: 32px;
+                  padding: 16px 24px 16px 24px;
+                "
+              >
+                {{ code }}
+              </h1>
+              <div
+                style="
+                  color: #d4d4d4;
+                  font-size: 16px;
+                  font-weight: normal;
+                  text-align: center;
+                  padding: 16px 24px 16px 24px;
+                "
+              >
+                This code will expire in 5 minutes.
+              </div>
+              <div
+                style="
+                  color: #868686;
+                  font-size: 13px;
+                  font-weight: normal;
+                  text-align: center;
+                  padding: 16px 24px 16px 24px;
+                "
+              >
+                :3
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>

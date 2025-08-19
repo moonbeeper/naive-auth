@@ -1,9 +1,11 @@
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
+use axum::http::HeaderMap;
 use rand_chacha::{
     ChaCha20Rng,
     rand_core::{RngCore, SeedableRng as _},
 };
+use simple_useragent::UserAgentParser;
 use tower_cookies::{Cookie, Cookies};
 use utoipa::ToSchema;
 
@@ -70,6 +72,7 @@ pub struct CreateSession {
 pub fn create_session(
     name: String,
     user: &User,
+    metadata: &DeviceMetadata,
     settings: &Settings,
 ) -> anyhow::Result<CreateSession> {
     let session = Session::builder()
@@ -81,6 +84,8 @@ pub fn create_session(
         .inactive_expires_at(
             chrono::Utc::now() + chrono::Duration::seconds(settings.session.inactive_age),
         )
+        .os(metadata.os.clone())
+        .browser(metadata.browser.clone())
         .created_at(chrono::Utc::now())
         .updated_at(chrono::Utc::now())
         .build();
@@ -171,5 +176,40 @@ pub const fn get_user_id(auth_context: &AuthContext, oauth_context: &OauthContex
         oauth_context.user_id()
     } else {
         auth_context.user_id()
+    }
+}
+
+static USER_AGENT_PARSER: LazyLock<UserAgentParser> = LazyLock::new(UserAgentParser::new);
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct DeviceMetadata {
+    os: String,
+    browser: String,
+    date_and_time: String,
+}
+
+impl Default for DeviceMetadata {
+    fn default() -> Self {
+        Self {
+            os: "Unknown".to_string(),
+            browser: "Unknown".to_string(),
+            date_and_time: chrono::Utc::now().format("%D %H:%M").to_string(),
+        }
+    }
+}
+impl DeviceMetadata {
+    pub fn from_headers(headers: &HeaderMap) -> Self {
+        let Some(user_agent) = headers.get("user-agent") else {
+            return Self::default();
+        };
+
+        let info =
+            USER_AGENT_PARSER.parse(user_agent.to_str().expect("Failed to parse user agent"));
+
+        Self {
+            os: info.os.family,
+            browser: info.client.family,
+            ..Self::default()
+        }
     }
 }

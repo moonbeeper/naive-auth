@@ -1,6 +1,25 @@
+use std::sync::LazyLock;
+use tera::{Context, Tera};
+
+use crate::auth::ops::DeviceMetadata;
+
+static TERA: LazyLock<Tera> = LazyLock::new(|| match Tera::new("src/email/html/**/*.html") {
+    Ok(t) => t,
+    Err(e) => {
+        println!("Parsing error(s): {e}");
+        ::std::process::exit(1);
+    }
+});
+
 pub trait EmailResource {
-    fn html(&self) -> String;
+    fn context(&self) -> Context;
+    fn template_name(&self) -> &str;
     fn subject(&self) -> String;
+    fn html(&self) -> String {
+        let context = self.context();
+        TERA.render(self.template_name(), &context)
+            .expect("Failed to render email template :(")
+    }
 }
 
 pub enum AuthEmails {
@@ -18,6 +37,7 @@ pub enum AuthEmails {
     },
     NewLogin {
         login: String,
+        metadata: DeviceMetadata,
     },
     TOTPAdded {
         login: String,
@@ -41,56 +61,99 @@ pub enum AuthEmails {
 
 impl EmailResource for AuthEmails {
     // could use tera in the future for templating.
-    fn html(&self) -> String {
+    fn context(&self) -> Context {
+        let mut context = Context::new();
         match self {
             Self::OtpLoginRequest { login, code }
             | Self::OtpRegisterRequest { email: login, code } => {
-                format!("Hi there {login}\nyour verification code is {code}")
+                context.insert("login", login);
+                context.insert("code", code);
+                // format!("Hi there {login}\nyour verification code is {code}")
             }
             Self::OtpRecoverRequest { login, code } => {
-                format!(
-                    "Hi there {login}, please use the following code to recover your account: {code}",
-                )
+                context.insert("login", login);
+                context.insert("code", code);
+                context.insert("recovery", &true);
+                // format!(
+                //     "Hi there {login}, please use the following code to recover your account: {code}",
+                // )
             }
-            Self::NewLogin { login } => {
-                format!("Hi there {login}, we noticed a new login to your account. thanks byeee")
+            Self::NewLogin { login, metadata } => {
+                context.insert("login", login);
+                context.insert("metadata", &metadata);
+
+                // format!("Hi there {login}, we noticed a new login to your account. thanks byeee")
             }
 
             Self::TOTPAdded { login } => {
-                format!("Hi there {login}, your 2FA is now enabled! *wahoo*")
+                context.insert("login", login);
+
+                // format!("Hi there {login}, your 2FA is now enabled! *wahoo*")
             }
             Self::TOTPRecoverUsed { login } => {
-                format!("Hi there {login}, one of your recovery codes has been used")
+                context.insert("login", login);
+
+                // format!("Hi there {login}, one of your recovery codes has been used")
             }
             Self::VerifyEmail { login, code } => {
-                format!("Hi there {login}, here's your email verification code: {code}")
+                context.insert("login", login);
+                context.insert("code", code);
+
+                // format!("Hi there {login}, here's your email verification code: {code}")
             }
             Self::EmailVerified { login } => {
-                format!("Hi there {login}, your email address has been verified! *wahoooooooooo*")
+                context.insert("login", login);
+
+                // format!("Hi there {login}, your email address has been verified! *wahoooooooooo*")
             }
             Self::OauthApproved {
                 login,
                 app_name,
                 scopes,
             } => {
-                format!(
-                    "Hi there {login}, seems like you approved the Oauth app {app_name} with the following scopes: {scopes}.",
-                )
+                context.insert("login", login);
+                context.insert("app_name", app_name);
+                context.insert("scopes", scopes);
+
+                // format!(
+                //     "Hi there {login}, seems like you approved the Oauth app {app_name} with the following scopes: {scopes}.",
+                // )
             }
+        }
+        context
+    }
+
+    fn template_name(&self) -> &str {
+        match self {
+            Self::OtpRecoverRequest { .. }
+            | Self::OtpRegisterRequest { .. }
+            | Self::OtpLoginRequest { .. } => "otp.html",
+            Self::NewLogin { .. } => "new_login.html",
+            Self::TOTPAdded { .. } => "totp_enabled.html",
+            Self::TOTPRecoverUsed { .. } => "totp_recovery_used.html",
+            Self::VerifyEmail { .. } => "verify_email.html",
+            Self::EmailVerified { .. } => "email_verified.html",
+            Self::OauthApproved { .. } => "oauth_app_authorized.html",
         }
     }
     fn subject(&self) -> String {
         match self {
             Self::OtpLoginRequest { code, .. } | Self::OtpRegisterRequest { code, .. } => {
-                format!("Your OTP code: {code}")
+                format!("[BeepAuth Account] Your OTP code is {code}")
             }
-            Self::NewLogin { .. } => "New Login Detected... you might be screwed lol".to_string(),
-            Self::TOTPAdded { .. } => "New account changes".to_string(),
-            Self::OtpRecoverRequest { .. } => "Recover your account".to_string(),
-            Self::TOTPRecoverUsed { .. } => "Recovery code used".to_string(),
-            Self::VerifyEmail { .. } => "Verify your email address".to_string(),
-            Self::EmailVerified { .. } => "Your email address has been verified".to_string(),
-            Self::OauthApproved { .. } => "Oauth app approved".to_string(),
+            Self::NewLogin { .. } => "[BeepAuth Account] New login on your account".to_string(),
+            Self::TOTPAdded { .. } => "[BeepAuth Account] New account changes".to_string(),
+            Self::OtpRecoverRequest { .. } => "[BeepAuth Account] Recover your account".to_string(),
+            Self::TOTPRecoverUsed { .. } => {
+                "[BeepAuth Account] One of your Two-Factor codes were used".to_string()
+            }
+            Self::VerifyEmail { .. } => "[BeepAuth Account] Verify your email address".to_string(),
+            Self::EmailVerified { .. } => {
+                "[BeepAuth Account] Your email address has been verified".to_string()
+            }
+            Self::OauthApproved { .. } => {
+                "[BeepAuth Account] A new OAuth app was authorized on your account".to_string()
+            }
         }
     }
 }

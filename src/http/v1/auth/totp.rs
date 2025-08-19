@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::State};
+use axum::{Extension, Json, extract::State, http::HeaderMap};
 use axum_valid::Valid;
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
@@ -11,7 +11,8 @@ use crate::{
     auth::{
         middleware::AuthContext,
         ops::{
-            create_session, get_totp_client, get_totp_recovery_codes, remove_session, totp_secret,
+            DeviceMetadata, create_session, get_totp_client, get_totp_recovery_codes,
+            remove_session, totp_secret,
         },
     },
     database::{
@@ -59,6 +60,7 @@ async fn exchange(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
+    headers: HeaderMap,
     Valid(Json(request)): Valid<Json<Exchange>>,
 ) -> HttpResult<Json<models::Session>> {
     remove_session(session, &cookies, &global).await?; // force logout
@@ -74,6 +76,8 @@ async fn exchange(
         &global.redis,
     )
     .await?;
+
+    let metadata = DeviceMetadata::from_headers(&headers);
 
     if let Some(AuthFlow::TotpExchange {
         user_id, secret, ..
@@ -96,7 +100,7 @@ async fn exchange(
         )
         .await?;
 
-        let sess = create_session("temporary".into(), &user, &global.settings)?;
+        let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
 
         let mut tx = global.database.begin().await?;
         sess.session.insert(&mut tx).await?;
@@ -105,7 +109,13 @@ async fn exchange(
         cookies.add(sess.cookie);
         global
             .mailer
-            .send(&user.email, AuthEmails::NewLogin { login: user.login })
+            .send(
+                &user.email,
+                AuthEmails::NewLogin {
+                    login: user.login,
+                    metadata,
+                },
+            )
             .await?;
 
         return Ok(Json(models::Session::from(sess.session)));
@@ -299,6 +309,7 @@ async fn recover_account(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
+    headers: HeaderMap,
     Valid(Json(request)): Valid<Json<RecoverAccount>>,
 ) -> HttpResult<Json<models::Session>> {
     remove_session(session, &cookies, &global).await?;
@@ -309,6 +320,7 @@ async fn recover_account(
     if user.totp_secret.is_none() {
         return Err(ApiError::InvalidLogin);
     }
+    let metadata = DeviceMetadata::from_headers(&headers);
 
     let mut mut_user = user.clone();
     let recovery_codes = get_totp_recovery_codes(user.totp_recovery_secret.as_ref().unwrap());
@@ -328,7 +340,7 @@ async fn recover_account(
         return Err(ApiError::InvalidRecoveryCode(request.recovery_code));
     }
 
-    let sess = create_session("temporary".into(), &user, &global.settings)?;
+    let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
     let mut tx = global.database.begin().await?;
     mut_user.update(&mut tx).await?;
     sess.session.insert(&mut tx).await?;

@@ -18,14 +18,16 @@ mod database;
 mod email;
 mod global;
 mod http;
+mod logger;
 mod settings;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().init();
-    tracing::info!("heelo");
+    // tracing_subscriber::fmt().init();
+    // tracing::info!("heelo");
     settings::cli::run().expect("Failed to run settings CLI");
     let settings = settings::Settings::load().expect("Failed to load settings");
+    logger::init(&settings.logging);
     // let app = Router::new().route("/", get(|| async { "Hello, World!" }));
 
     let global = GlobalState::new(settings)
