@@ -107,6 +107,28 @@ impl Session {
         Ok(())
     }
 
+    pub async fn delete_many(
+        ids: Vec<SessionId>,
+        transaction: &mut PgTransaction<'_>,
+    ) -> DatabaseError<()> {
+        sqlx::query!("delete from sessions where id = any($1)", &ids as &[SessionId]) // attrocity
+            .execute(&mut **transaction)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn delete_all_by_user(
+        id: UserId,
+        transaction: &mut PgTransaction<'_>,
+    ) -> DatabaseError<()> {
+        sqlx::query!("delete from sessions where user_id = $1", id as UserId)
+            .execute(&mut **transaction)
+            .await?;
+
+        Ok(())
+    }
+
     pub async fn list_user_sessions<'a, E>(id: UserId, executor: E) -> DatabaseError<Vec<Self>>
     where
         E: PgExecutor<'a>,
@@ -135,8 +157,6 @@ impl Session {
         )
         .fetch_all(executor)
         .await?;
-
-        println!("sessions: {sessions:?}");
 
         Ok(sessions)
     }

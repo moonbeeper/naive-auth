@@ -312,7 +312,8 @@ pub struct ExchangeResponse {
         (status = 200, description = "OAuth token exchanged", body = ExchangeResponse),
         (status = 400, description = "Invalid request or client")
     ),
-    tag = "oauth"
+    tag = "oauth",
+    operation_id = "authOauthToken"
 )]
 async fn exchange(
     State(global): State<Arc<GlobalState>>,

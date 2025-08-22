@@ -80,6 +80,10 @@ impl Ulid {
     pub const fn nil() -> Self {
         Self(ulid::Ulid::nil())
     }
+
+    pub fn to_uuid(self) -> uuid::Uuid {
+        self.0.into()
+    }
 }
 
 impl FromStr for Ulid {

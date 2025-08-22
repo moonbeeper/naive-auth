@@ -14,6 +14,8 @@ pub struct HttpSettings {
     pub origin: String,
     #[default(true)]
     pub swagger_ui: bool,
+    #[default("https://localhost:8080")]
+    pub app_url: String,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]
@@ -132,7 +134,7 @@ pub struct Settings {
 
 impl Settings {
     pub fn load() -> anyhow::Result<Self> {
-        tracing::info!("Loading settings...");
+        println!("Loading settings...");
         // seems like configrs got overhauled. No need for figment i guess.
         let config = config::Config::builder()
             .add_source(config::File::with_name("settings.toml").required(false))
@@ -141,14 +143,11 @@ impl Settings {
 
         match config.try_deserialize::<Self>() {
             Ok(settings) => {
-                tracing::info!("Settings loaded successfully!");
+                println!("Settings loaded successfully!");
                 Ok(settings)
             }
             Err(e) => {
-                tracing::error!(
-                    "Failed to deserialize settings! Will be using the defaults: {:?}",
-                    e
-                );
+                println!("Failed to deserialize settings! Will be using the defaults: {e:?}");
                 Ok(Self::default())
             }
         }
@@ -156,15 +155,15 @@ impl Settings {
 
     pub fn create_settings_file() -> anyhow::Result<()> {
         let path = Path::new("settings.toml");
-        if !path.exists() {
-            // tracing::warn!("Settings file does not exist. I'll create it for you :)");
-            let mut file = File::create(path)?;
-            file.write_all(toml::to_string_pretty(&Self::default())?.as_bytes())?;
-            // tracing::info!(
-            //     "Settings file created at {}. They will be loaded right now :)",
-            //     path.display()
-            // );
-        }
+        // if !path.exists() {
+        // tracing::warn!("Settings file does not exist. I'll create it for you :)");
+        let mut file = File::create(path)?;
+        file.write_all(toml::to_string_pretty(&Self::default())?.as_bytes())?;
+        // tracing::info!(
+        //     "Settings file created at {}. They will be loaded right now :)",
+        //     path.display()
+        // );
+        // }
 
         Ok(())
     }

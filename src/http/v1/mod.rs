@@ -65,31 +65,11 @@ async fn get_user(
     }
 
     let user_id = get_user_id(&auth_context, &oauth_context);
-    // let token = create_token();
-    // println!("aa: {:?}", token);
-
-    // let argon2 = Argon2::default();
-    // let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());
-    // let password_hash = argon2.hash_password(token.as_bytes(), &salt)?.to_string();
-
-    // println!("hased: {:?}", password_hash);
     let Some(user) = User::get(user_id, &global.database).await? else {
         remove_session(auth_context, &cookies, &global).await?;
         return Err(ApiError::InvalidLogin);
     };
 
-    // let mut tx = global.database.begin().await?;
-    // OauthApp::builder()
-    //     .name("Test App".to_string())
-    //     .created_by(user.id)
-    //     .description("wawa".to_string())
-    //     .key(password_hash)
-    //     .callback_url("http://localhost:8080/oauth/callback".to_string())
-    //     .scopes(OauthScope::USER.bits())
-    //     .build()
-    //     .insert(&mut tx)
-    //     .await?;
-    // tx.commit().await?;
     Ok(Json(models::User::from(user).remove_user(
         !auth_context.is_authenticated()
             && !oauth_context.has_scopes(&vec![OauthScope::USER_EMAIL]),
@@ -114,4 +94,14 @@ where
             Self::Right(r) => Json(r).into_response(),
         }
     }
+}
+
+// todo: this really shouldn't be here
+pub fn string_trim<'de, D>(d: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+    let string = String::deserialize(d)?;
+    Ok(string.trim().to_string())
 }

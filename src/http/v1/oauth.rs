@@ -154,7 +154,7 @@ async fn delete_app(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
-    Path(request): Path<AppParam>,
+    Valid(Path(request)): Valid<Path<AppParam>>,
 ) -> HttpResult<()> {
     if !auth_context.is_authenticated() {
         return Err(ApiError::YouAreNotLoggedIn);
@@ -210,7 +210,7 @@ async fn update_app(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
-    Path(param): Path<AppParam>,
+    Valid(Path(param)): Valid<Path<AppParam>>,
     Valid(Json(request)): Valid<Json<UpdateApp>>,
 ) -> HttpResult<()> {
     if !auth_context.is_authenticated() {
@@ -424,7 +424,7 @@ async fn get_app(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
-    Path(id): Path<OauthAppId>,
+    Valid(Path(request)): Valid<Path<AppParam>>,
 ) -> HttpResult<Json<models::OauthApp>> {
     if !auth_context.is_authenticated() {
         return Err(ApiError::YouAreNotLoggedIn);
@@ -434,12 +434,12 @@ async fn get_app(
         return Err(ApiError::InvalidLogin);
     };
 
-    let Some(app) = OauthApp::get(&id, &global.database).await? else {
-        return Err(ApiError::OAuthAppNotFound(id.to_string()));
+    let Some(app) = OauthApp::get(&request.id, &global.database).await? else {
+        return Err(ApiError::OAuthAppNotFound(request.id.to_string()));
     };
 
     if app.created_by != user.id {
-        return Err(ApiError::OAuthAppNotFound(id.to_string()));
+        return Err(ApiError::OAuthAppNotFound(request.id.to_string()));
     }
 
     Ok(Json(models::OauthApp::from(app)))

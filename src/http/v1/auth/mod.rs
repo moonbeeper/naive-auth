@@ -30,7 +30,6 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
         .nest("/totp", totp::routes())
         .nest("/oauth", oauth::routes())
         .routes(routes!(verify_email))
-        .routes(routes!(get_recovery_options))
         .routes(routes!(signout))
 }
 
@@ -107,38 +106,6 @@ async fn verify_email(
 pub struct CurrentActiveOptions {
     pub otp: bool,
     pub totp: bool,
-}
-
-/// Get the available recovery options for an user. (placeholder?)
-#[utoipa::path(
-    get,
-    path = "/recovery-options",
-    responses(
-        (status = 200, description = "Recovery options", body = CurrentActiveOptions),
-        (status = 401, description = "Not authenticated"),
-    ),
-    tag = "auth"
-)]
-async fn get_recovery_options(
-    State(global): State<Arc<GlobalState>>,
-    cookies: Cookies,
-    Extension(auth_context): Extension<AuthContext>,
-) -> HttpResult<Json<CurrentActiveOptions>> {
-    if !auth_context.is_authenticated() {
-        return Err(ApiError::YouAreNotLoggedIn);
-    }
-
-    let Some(user) = User::get(auth_context.user_id(), &global.database).await? else {
-        remove_session(auth_context, &cookies, &global).await?;
-        return Err(ApiError::InvalidLogin);
-    };
-
-    let options = CurrentActiveOptions {
-        otp: true,
-        totp: user.totp_secret.is_some(),
-    };
-
-    Ok(Json(options))
 }
 
 /// Sign out of this current session

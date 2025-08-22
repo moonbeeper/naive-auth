@@ -4,6 +4,7 @@ use axum::{
     Extension, Json,
     extract::{Path, State},
 };
+use axum_valid::Valid;
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -107,7 +108,7 @@ async fn delete_session(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
-    Path(request): Path<SessionIdParam>,
+    Valid(Path(request)): Valid<Path<SessionIdParam>>,
 ) -> HttpResult<()> {
     if !auth_context.is_authenticated() {
         return Err(ApiError::YouAreNotLoggedIn);
@@ -152,7 +153,7 @@ async fn get_session(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
     Extension(auth_context): Extension<AuthContext>,
-    Path(request): Path<SessionIdParam>,
+    Valid(Path(request)): Valid<Path<SessionIdParam>>,
 ) -> HttpResult<Json<models::Session>> {
     if !auth_context.is_authenticated() {
         return Err(ApiError::YouAreNotLoggedIn);

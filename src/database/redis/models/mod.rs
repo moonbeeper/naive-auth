@@ -56,4 +56,14 @@ pub trait RedisFlow: serde::Serialize + serde::de::DeserializeOwned + Sync + Sen
     ) -> impl std::future::Future<Output = Result<(), RedisError>> + Send {
         async move { redis.del(key).await.map_err(Into::into) }
     }
+
+    fn ttl_from_redis(
+        key: &str,
+        redis: &fred::clients::Pool,
+    ) -> impl std::future::Future<Output = Result<chrono::Duration, RedisError>> + Send {
+        async move {
+            let ttl = redis.ttl(key).await?;
+            Ok(chrono::Duration::seconds(ttl))
+        }
+    }
 }

@@ -12,6 +12,7 @@ use utoipa::{
     },
 };
 use utoipa_axum::router::OpenApiRouter;
+use utoipa_scalar::{Scalar, Servable as _};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
@@ -44,7 +45,17 @@ pub type HttpResult<T> = Result<T, error::ApiError>;
 pub struct ApiDoc;
 
 fn routes(global: &Arc<GlobalState>) -> OpenApiRouter {
-    OpenApiRouter::with_openapi(ApiDoc::openapi())
+    let mut openapi = ApiDoc::openapi();
+
+    let components = openapi.components.as_mut().unwrap();
+    let mut session = ApiKeyValue::new(global.settings.session.cookie_name.clone());
+    session.description = Some("Session cookie used for authentication. Shouldn't be needed as the session is set on the browser's cookies".to_string());
+    components.add_security_scheme(
+        "Cookie Auth (Session JWT)",
+        SecurityScheme::ApiKey(ApiKey::Cookie(session)),
+    );
+
+    OpenApiRouter::with_openapi(openapi)
         .nest("/v1", v1::routes())
         .route("/", get(|| async { "Hello, World!" }))
         .layer(
@@ -69,12 +80,13 @@ pub async fn run(
 
     socket.bind(global.settings.http.bind)?;
     let listener = socket.listen(1024)?;
-    
+
     let router = routes(&global).split_for_parts();
     let router = if global.settings.http.swagger_ui {
         router
             .0
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", router.1.clone()))
+            .merge(Scalar::with_url("/scalar", router.1.clone()))
     } else {
         router.0
     };
@@ -104,13 +116,6 @@ impl utoipa::Modify for WhyUtoipa {
         components.add_security_scheme(
             "Bearer Auth (OAuth2 Access Token)",
             SecurityScheme::Http(oauth),
-        );
-
-        let mut session = ApiKeyValue::new("BSESS");
-        session.description = Some("Session cookie used for authentication".to_string());
-        components.add_security_scheme(
-            "Cookie Auth (Session JWT)",
-            SecurityScheme::ApiKey(ApiKey::Cookie(session)),
         );
     }
 }

@@ -35,8 +35,6 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
         .routes(routes!(login))
         .routes(routes!(exchange_login))
-        .routes(routes!(recover_account))
-        .routes(routes!(recover_account_exchange))
         .routes(routes!(exchange))
 }
 
@@ -60,7 +58,8 @@ pub struct AuthResponse {
         (status = 200, description = "Login flow started", body = AuthResponse),
         (status = 400, description = "Invalid login, email not verified, etc."),
     ),
-    tag = "otp"
+    tag = "otp",
+    operation_id = "authOtpLogin"
 )]
 async fn login(
     State(global): State<Arc<GlobalState>>,
@@ -73,25 +72,6 @@ async fn login(
         return register(global, request.email).await;
     };
 
-    if !user.email_verified {
-        let code = get_totp_client(&totp_secret().to_encoded()).generate_current()?;
-        AuthFlow::VerifyEmail { code: code.clone() }
-            .store(
-                AuthFlowNamespace::VerifyEmail,
-                AuthFlowKey::UserId(user.id),
-                &global.redis,
-            )
-            .await?;
-
-        let mail = AuthEmails::VerifyEmail {
-            login: user.login,
-            code,
-        };
-
-        global.mailer.send(&user.email, mail).await?;
-        return Err(ApiError::EmailIsNotVerified);
-    }
-
     let flow_id = FlowId::new();
     let secret = totp_secret().to_encoded();
 
@@ -100,7 +80,7 @@ async fn login(
     };
     flow.store(
         AuthFlowNamespace::OtpAuth,
-        AuthFlowKey::OtpAuth {
+        AuthFlowKey::FlowEmail {
             flow_id,
             email: user.email.clone(),
         },
@@ -137,7 +117,7 @@ async fn register(global: Arc<GlobalState>, email: String) -> HttpResult<Json<Au
     };
     flow.store(
         AuthFlowNamespace::OtpAuth,
-        AuthFlowKey::OtpAuth {
+        AuthFlowKey::FlowEmail {
             flow_id,
             email: email.clone(),
         },
@@ -167,6 +147,7 @@ pub struct AuthExchange {
 }
 
 /// Exchange the OTP code sent to the user's email for a session
+#[allow(clippy::too_many_lines)] // leave me alone please
 #[utoipa::path(
     post,
     path = "/exchange-login",
@@ -175,7 +156,8 @@ pub struct AuthExchange {
         (status = 200, description = "Exchanged for session or TOTP challenge", body = JsonEither<models::Session, TotpResponse>),
         (status = 400, description = "Invalid code or login"),
     ),
-    tag = "otp"
+    tag = "otp",
+    operation_id = "authOtpExchangeLogin"
 )]
 async fn exchange_login(
     State(global): State<Arc<GlobalState>>,
@@ -192,18 +174,17 @@ async fn exchange_login(
 
     let flow: Option<AuthFlow> = AuthFlow::get(
         AuthFlowNamespace::OtpAuth,
-        AuthFlowKey::OtpAuth {
+        AuthFlowKey::FlowEmail {
             flow_id: request.link_id,
             email: request.email.clone(),
         },
         &global.redis,
     )
     .await?;
-
     let metadata = DeviceMetadata::from_headers(&headers);
 
     if let Some(AuthFlow::OtpLoginRequest { secret }) = flow {
-        let Some(user) = User::get_by_email(&request.email, &global.database).await? else {
+        let Some(mut user) = User::get_by_email(&request.email, &global.database).await? else {
             return Err(ApiError::InvalidLogin);
         };
 
@@ -214,13 +195,20 @@ async fn exchange_login(
 
         AuthFlow::remove(
             AuthFlowNamespace::OtpAuth,
-            AuthFlowKey::OtpAuth {
+            AuthFlowKey::FlowEmail {
                 flow_id: request.link_id,
                 email: request.email.clone(),
             },
             &global.redis,
         )
         .await?;
+
+        if !user.email_verified {
+            user.email_verified = true;
+            let mut tx = global.database.begin().await?;
+            user.update(&mut tx).await?;
+            tx.commit().await?;
+        }
 
         if user.totp_secret.is_some() {
             let response = create_totp_login_exchange(&user, &global.redis).await?;
@@ -259,7 +247,7 @@ async fn exchange_login(
 
         AuthFlow::remove(
             AuthFlowNamespace::OtpAuth,
-            AuthFlowKey::OtpAuth {
+            AuthFlowKey::FlowEmail {
                 flow_id: request.link_id,
                 email: request.email.clone(),
             },
@@ -308,7 +296,8 @@ async fn exchange_login(
         (status = 200, description = "Successful OTP exchange"),
         (status = 400, description = "Invalid code or login"),
     ),
-    tag = "otp"
+    tag = "otp",
+    operation_id = "authOtpExchange"
 )]
 async fn exchange(
     State(global): State<Arc<GlobalState>>,
@@ -371,156 +360,4 @@ async fn exchange(
     }
 
     Err(ApiError::OTPExchangeNotFound(request.link_id.to_string()))
-}
-
-#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
-pub struct RecoverAccount {
-    #[validate(email)]
-    email: String,
-}
-
-/// Recover an account via an OTP code sent to the user's email (this is actually a copy of the login one?)
-#[utoipa::path(
-    post,
-    path = "/recover",
-    request_body = RecoverAccount,
-    responses(
-        (status = 200, description = "Recovery flow started", body = AuthResponse),
-        (status = 400, description = "Invalid login or email not verified"),
-    ),
-    tag = "otp"
-)]
-async fn recover_account(
-    State(global): State<Arc<GlobalState>>,
-    Extension(session): Extension<AuthContext>,
-    cookies: Cookies,
-    Valid(Json(request)): Valid<Json<RecoverAccount>>,
-) -> HttpResult<Json<AuthResponse>> {
-    remove_session(session, &cookies, &global).await?; // force logout
-
-    let Some(user) = User::get_by_email(&request.email, &global.database).await? else {
-        return Err(ApiError::InvalidLogin);
-    };
-
-    if !user.email_verified {
-        let code = get_totp_client(&totp_secret().to_encoded()).generate_current()?;
-        AuthFlow::VerifyEmail { code: code.clone() }
-            .store(
-                AuthFlowNamespace::VerifyEmail,
-                AuthFlowKey::UserId(user.id),
-                &global.redis,
-            )
-            .await?;
-
-        let mail = AuthEmails::VerifyEmail {
-            login: user.login,
-            code,
-        };
-
-        global.mailer.send(&user.email, mail).await?;
-
-        return Err(ApiError::EmailIsNotVerified);
-    }
-
-    let secret = totp_secret().to_encoded();
-    let code = get_totp_client(&secret).generate_current()?;
-
-    let flow_id = FlowId::new();
-    AuthFlow::OtpRecoverRequest { code: code.clone() }
-        .store(
-            AuthFlowNamespace::OtpAuth,
-            AuthFlowKey::FlowId(flow_id),
-            &global.redis,
-        )
-        .await?;
-
-    let mail = AuthEmails::OtpRecoverRequest {
-        login: user.login,
-        code,
-    };
-    global.mailer.send(&user.email, mail).await?;
-
-    Ok(Json(AuthResponse { link_id: flow_id }))
-}
-
-#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
-pub struct RecoverAccountExchange {
-    #[validate(email)]
-    email: String,
-    #[validate(length(equal = 26))]
-    link_id: FlowId,
-    #[validate(length(equal = 6))]
-    code: String,
-}
-
-/// Exchange the OTP code sent to the user's email for a session. (this is actually a copy of the login one?)
-#[utoipa::path(
-    post,
-    path = "/recover/exchange",
-    request_body = RecoverAccountExchange,
-    responses(
-        (status = 200, description = "Session after recovery", body = models::Session),
-        (status = 400, description = "Invalid code, login, or flow not found"),
-    ),
-    tag = "otp"
-)]
-async fn recover_account_exchange(
-    State(global): State<Arc<GlobalState>>,
-    Extension(session): Extension<AuthContext>,
-    cookies: Cookies,
-    headers: HeaderMap,
-    Valid(Json(request)): Valid<Json<RecoverAccountExchange>>,
-) -> HttpResult<Json<models::Session>> {
-    remove_session(session, &cookies, &global).await?; // force logout
-
-    if request.code.trim().is_empty() {
-        return Err(ApiError::InvalidOTPCode(request.code));
-    }
-
-    let Some(user) = User::get_by_email(&request.email, &global.database).await? else {
-        return Err(ApiError::InvalidLogin);
-    };
-
-    let flow = AuthFlow::get(
-        AuthFlowNamespace::OtpAuth,
-        AuthFlowKey::FlowId(request.link_id),
-        &global.redis,
-    )
-    .await?;
-
-    let metadata = DeviceMetadata::from_headers(&headers);
-
-    if let Some(AuthFlow::OtpRecoverRequest { code }) = flow {
-        if code != request.code {
-            return Err(ApiError::InvalidRecoveryCode(request.code));
-        }
-        AuthFlow::remove(
-            AuthFlowNamespace::OtpAuth,
-            AuthFlowKey::FlowId(request.link_id),
-            &global.redis,
-        )
-        .await?;
-
-        let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
-
-        let mut tx = global.database.begin().await?;
-        sess.session.insert(&mut tx).await?;
-        tx.commit().await?;
-
-        cookies.add(sess.cookie);
-        global
-            .mailer
-            .send(
-                &user.email,
-                AuthEmails::NewLogin {
-                    login: user.login,
-                    metadata,
-                },
-            )
-            .await?;
-
-        return Ok(Json(models::Session::from(sess.session)));
-    }
-
-    Err(ApiError::OTPRecoveryFlowNotFound)
 }

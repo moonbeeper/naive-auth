@@ -31,10 +31,10 @@ pub enum AuthEmails {
         email: String,
         code: String,
     },
-    OtpRecoverRequest {
-        login: String,
-        code: String,
-    },
+    // OtpRecoverRequest {
+    //     login: String,
+    //     code: String,
+    // },
     NewLogin {
         login: String,
         metadata: DeviceMetadata,
@@ -63,6 +63,9 @@ pub enum AuthEmails {
     TotpDisabled {
         login: String,
     },
+    PasswordReset {
+        reset_url: String,
+    },
 }
 
 impl EmailResource for AuthEmails {
@@ -76,14 +79,14 @@ impl EmailResource for AuthEmails {
                 context.insert("code", code);
                 // format!("Hi there {login}\nyour verification code is {code}")
             }
-            Self::OtpRecoverRequest { login, code } => {
-                context.insert("login", login);
-                context.insert("code", code);
-                context.insert("recovery", &true);
-                // format!(
-                //     "Hi there {login}, please use the following code to recover your account: {code}",
-                // )
-            }
+            // Self::OtpRecoverRequest { login, code } => {
+            //     context.insert("login", login);
+            //     context.insert("code", code);
+            //     context.insert("recovery", &true);
+            //     // format!(
+            //     //     "Hi there {login}, please use the following code to recover your account: {code}",
+            //     // )
+            // }
             Self::NewLogin { login, metadata } => {
                 context.insert("login", login);
                 context.insert("metadata", &metadata);
@@ -136,15 +139,17 @@ impl EmailResource for AuthEmails {
             Self::TotpDisabled { login } => {
                 context.insert("login", login);
             }
+            Self::PasswordReset { reset_url } => {
+                context.insert("reset_url", reset_url);
+            }
         }
         context
     }
 
     fn template_name(&self) -> &str {
         match self {
-            Self::OtpRecoverRequest { .. }
-            | Self::OtpRegisterRequest { .. }
-            | Self::OtpLoginRequest { .. } => "otp.html",
+            // Self::OtpRecoverRequest { .. }
+            Self::OtpRegisterRequest { .. } | Self::OtpLoginRequest { .. } => "otp.html",
             Self::NewLogin { .. } => "new_login.html",
             Self::TOTPAdded { .. } => "totp_enabled.html",
             Self::TOTPRecoverUsed { .. } => "totp_recovery_used.html",
@@ -153,6 +158,7 @@ impl EmailResource for AuthEmails {
             Self::OauthApproved { .. } => "oauth_app_authorized.html",
             Self::TotpRecoveryViewed { .. } => "totp_recovery_viewed.html",
             Self::TotpDisabled { .. } => "totp_disabled.html",
+            Self::PasswordReset { .. } => "password_reset.html",
         }
     }
     fn subject(&self) -> String {
@@ -162,7 +168,7 @@ impl EmailResource for AuthEmails {
             }
             Self::NewLogin { .. } => "[BeepAuth Account] New login on your account".to_string(),
             Self::TOTPAdded { .. } => "[BeepAuth Account] New account changes".to_string(),
-            Self::OtpRecoverRequest { .. } => "[BeepAuth Account] Recover your account".to_string(),
+            // Self::OtpRecoverRequest { .. } => "[BeepAuth Account] Recover your account".to_string(),
             Self::TOTPRecoverUsed { .. } => {
                 "[BeepAuth Account] One of your Two-Factor codes were used".to_string()
             }
@@ -179,6 +185,7 @@ impl EmailResource for AuthEmails {
             Self::TotpDisabled { .. } => {
                 "[BeepAuth Account] Your Two-Factor Authentication has been disabled".to_string()
             }
+            Self::PasswordReset { .. } => "[BeepAuth Account] Reset your password".to_string(),
         }
     }
 }

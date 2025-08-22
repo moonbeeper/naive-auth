@@ -33,6 +33,11 @@ pub enum AuthFlow {
     VerifyEmail {
         code: String,
     },
+    PasswordReset {
+        user_id: UserId,
+        has_totp: bool,
+        totp_verified: bool,
+    },
 }
 
 pub enum AuthFlowNamespace {
@@ -43,6 +48,7 @@ pub enum AuthFlowNamespace {
     TotpExchange,
     TotpLoginExchange,
     VerifyEmail,
+    PasswordReset,
 }
 
 impl AuthFlowNamespace {
@@ -55,13 +61,14 @@ impl AuthFlowNamespace {
             Self::TotpExchange => "totp:exchange",
             Self::TotpLoginExchange => "totp:login:exchange",
             Self::VerifyEmail => "verify:email",
+            Self::PasswordReset => "password:reset",
         }
     }
 }
 
 #[derive(Clone)]
 pub enum AuthFlowKey {
-    OtpAuth { flow_id: FlowId, email: String },
+    FlowEmail { flow_id: FlowId, email: String },
     FlowId(FlowId),
     UserFlow { flow_id: FlowId, user_id: UserId },
     UserId(UserId),
@@ -70,7 +77,7 @@ pub enum AuthFlowKey {
 impl Display for AuthFlowKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::OtpAuth { flow_id, email } => write!(f, "{flow_id}:{email}"),
+            Self::FlowEmail { flow_id, email } => write!(f, "{flow_id}:{email}"),
             Self::FlowId(ulid) => write!(f, "{ulid}"),
             Self::UserId(user_id) => write!(f, "{user_id}"), // Self::TotpUsed { user_id } => write!(f, "{user_id}"),
             Self::UserFlow { flow_id, user_id } => {
@@ -89,7 +96,7 @@ impl AuthFlow {
             | Self::TotpExchange { .. }
             | Self::OtpRecoverRequest { .. } => chrono::Duration::minutes(5),
             Self::TotpEnableRequest { .. } => chrono::Duration::minutes(10),
-            Self::VerifyEmail { .. } => chrono::Duration::minutes(30),
+            Self::VerifyEmail { .. } | Self::PasswordReset { .. } => chrono::Duration::minutes(30),
         }
     }
 
@@ -119,6 +126,26 @@ impl AuthFlow {
     ) -> Result<(), RedisError> {
         let key = format!("{}:{key}", namespace.namespace());
         Self::del_from_redis(&key, redis).await
+    }
+
+    // this method is pretty bad. but its the only way I can think of doing it "easily"
+    pub async fn mutate(
+        self,
+        to: Self,
+        namespace: AuthFlowNamespace,
+        key: AuthFlowKey,
+        preserve_ttl: bool,
+        redis: &fred::clients::Pool,
+    ) -> Result<(), RedisError> {
+        let key = format!("{}:{key}", namespace.namespace());
+
+        let ttl = if preserve_ttl {
+            Self::ttl_from_redis(&key, redis).await?
+        } else {
+            self.duration()
+        };
+
+        to.insert_into_redis(&key, ttl, redis).await
     }
 }
 

@@ -5,6 +5,7 @@ use rand_chacha::{
     ChaCha20Rng,
     rand_core::{RngCore, SeedableRng as _},
 };
+use regex::Regex;
 use simple_useragent::UserAgentParser;
 use tower_cookies::{Cookie, Cookies};
 use utoipa::ToSchema;
@@ -25,6 +26,11 @@ use crate::{
     http::error::ApiError,
     settings::Settings,
 };
+
+// todo: this really shouldn't be here
+pub static TOTP_CODE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\d{6}$").expect("failed to compile TOTP code regex"));
+
 
 pub async fn remove_session(
     auth_context: AuthContext,

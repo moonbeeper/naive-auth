@@ -90,6 +90,12 @@ pub enum ApiError {
         "The OAuth callback URL is invalid. Are you sure it doesn't contain a fragment in it (#)?"
     )]
     OAuthInvalidUri,
+    #[error("The passwords do not match. Are you sure you typed them correctly?")]
+    PasswordDoesNotMatch,
+    #[error("The password you provided is too weak. May you consider using a stronger password?")]
+    PasswordLowStrength,
+    #[error("The recovery link you provided was not found or has expired")]
+    RecoveryLinkNotFound,
 }
 
 impl ApiError {
@@ -133,6 +139,9 @@ impl ApiError {
             Self::SessionDoesNotExist(_) => axum::http::StatusCode::NOT_FOUND,
             Self::FailedParsingURL(_) => axum::http::StatusCode::BAD_REQUEST,
             Self::OAuthInvalidUri => axum::http::StatusCode::BAD_REQUEST,
+            Self::PasswordDoesNotMatch => axum::http::StatusCode::BAD_REQUEST,
+            Self::PasswordLowStrength => axum::http::StatusCode::BAD_REQUEST,
+            Self::RecoveryLinkNotFound => axum::http::StatusCode::NOT_FOUND,
         }
     }
 }
