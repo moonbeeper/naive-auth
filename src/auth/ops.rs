@@ -31,7 +31,6 @@ use crate::{
 pub static TOTP_CODE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\d{6}$").expect("failed to compile TOTP code regex"));
 
-
 pub async fn remove_session(
     auth_context: AuthContext,
     cookie_jar: &Cookies,
@@ -75,6 +74,7 @@ pub struct CreateSession {
     pub cookie: Cookie<'static>,
 }
 
+// TODO: remove session name
 pub fn create_session(
     name: String,
     user: &User,

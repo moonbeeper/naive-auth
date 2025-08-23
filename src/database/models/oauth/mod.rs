@@ -5,7 +5,7 @@ use crate::database::{DatabaseError, models::user::UserId, string_id::StringId};
 
 mod authorized;
 pub use authorized::*;
-    
+
 pub type OauthAppId = StringId;
 
 #[derive(Debug, Clone, TypedBuilder)]

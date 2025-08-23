@@ -14,7 +14,7 @@ use crate::{
     auth::{middleware::AuthContext, ops::remove_session},
     database::models::session::{Session, SessionId},
     global::GlobalState,
-    http::{HttpResult, error::ApiError, v1::models},
+    http::{HttpResult, SESSION_TAG, error::ApiError, v1::models},
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -23,6 +23,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
         .routes(routes!(list_sessions))
         .routes(routes!(delete_session))
         .routes(routes!(get_session))
+        .routes(routes!(delete_all_sessions))
 }
 
 /// Get the current session
@@ -32,9 +33,8 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     responses(
         (status = 200, description = "Your current session", body = models::Session),
         (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Invalid login or session")
     ),
-    tag = "session"
+    tag = SESSION_TAG
 )]
 async fn current_session(
     State(global): State<Arc<GlobalState>>,
@@ -58,10 +58,10 @@ async fn current_session(
     get,
     path = "/list",
     responses(
-        (status = 200, description = "List of your open sessions", body = Vec<models::Session>),
+        (status = 200, description = "A list of the your open sessions", body = Vec<models::Session>),
         (status = 401, description = "Not authenticated"),
     ),
-    tag = "session"
+    tag = SESSION_TAG
 )]
 async fn list_sessions(
     State(global): State<Arc<GlobalState>>,
@@ -91,7 +91,7 @@ pub struct SessionIdParam {
     id: SessionId,
 }
 
-/// Delete one of your sessions by its ID
+/// Delete one of your sessions
 #[utoipa::path(
     delete,
     path = "/{id}",
@@ -100,9 +100,11 @@ pub struct SessionIdParam {
     ),
     responses(
         (status = 200, description = "Successfully deleted the session"),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated or Sudo is not enabled"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 404, description = "Session not found"),
     ),
-    tag = "session"
+    tag = SESSION_TAG
 )]
 async fn delete_session(
     State(global): State<Arc<GlobalState>>,
@@ -136,7 +138,7 @@ async fn delete_session(
     Ok(())
 }
 
-/// Get one of your sessions by its ID
+/// Get info about one of your open sessions
 #[utoipa::path(
     get,
     path = "/{id}",
@@ -145,9 +147,11 @@ async fn delete_session(
     ),
     responses(
         (status = 200, description = "The session info", body = Vec<models::TinySession>),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated or Sudo is not enabled"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 404, description = "Session not found"),
     ),
-    tag = "session"
+    tag = SESSION_TAG
 )]
 async fn get_session(
     State(global): State<Arc<GlobalState>>,
@@ -175,4 +179,29 @@ async fn get_session(
     };
 
     Ok(Json(models::Session::from(session)))
+}
+
+/// Delete all your open sessions
+#[utoipa::path(
+    delete,
+    path = "/all",
+    responses(
+        (status = 200, description = "Deleted all open sessions"),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = SESSION_TAG
+)]
+async fn delete_all_sessions(
+    State(global): State<Arc<GlobalState>>,
+    Extension(auth_context): Extension<AuthContext>,
+) -> HttpResult<()> {
+    if !auth_context.is_authenticated() {
+        return Err(ApiError::YouAreNotLoggedIn);
+    }
+
+    let mut tx = global.database.begin().await?;
+    Session::delete_all_by_user(auth_context.user_id(), &mut tx).await?;
+    tx.commit().await?;
+
+    Ok(())
 }

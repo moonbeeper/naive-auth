@@ -13,7 +13,7 @@ use crate::{
     database::models::{session::Session, user::User},
     email::resources::AuthEmails,
     global::GlobalState,
-    http::{HttpResult, error::ApiError},
+    http::{HttpResult, TOTP_TAG, error::ApiError},
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -27,16 +27,18 @@ struct TotpRecoveryResponse {
     recovery_codes: Vec<String>,
 }
 
-/// Get the current user's TOTP recovery codes if they have TOTP enabled
+/// Get your TOTP recovery codes
+///
+/// This will return your TOTP recovery codes IF you have TOTP enabled
 #[utoipa::path(
     get,
     path = "/recovery",
     responses(
         (status = 200, description = "TOTP Recovery codes", body = TotpRecoveryResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 400, description = "Invalid request or login")
+        (status = 401, description = "Not authenticated or Sudo is not enabled"),
+        (status = 400, description = "Validation or parsing error"),
     ),
-    tag = "totp"
+    tag = TOTP_TAG
 )]
 async fn get_totp_recovery(
     State(global): State<Arc<GlobalState>>,
@@ -74,16 +76,18 @@ async fn get_totp_recovery(
     Ok(Json(TotpRecoveryResponse { recovery_codes }))
 }
 
-/// Disable TOTP from this account (if enabled)
+/// Disable TOTP from this account
+///
+/// This will disable TOTP from your account IF you have TOTP enabled
 #[utoipa::path(
     delete,
     path = "/",
     responses(
         (status = 200, description = "TOTP disabled successfully"),
-        (status = 400, description = "Invalid code or TOTP not enabled"),
-        (status = 401, description = "Not logged in")
+        (status = 401, description = "Not authenticated or Sudo is not enabled"),
+        (status = 400, description = "Validation or parsing error"),
     ),
-    tag = "totp"
+    tag = TOTP_TAG
 )]
 async fn disable(
     State(global): State<Arc<GlobalState>>,

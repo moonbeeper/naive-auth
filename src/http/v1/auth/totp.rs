@@ -25,7 +25,7 @@ use crate::{
     email::resources::AuthEmails,
     global::GlobalState,
     http::{
-        HttpResult,
+        HttpResult, TOTP_TAG,
         error::ApiError,
         v1::{models, string_trim},
     },
@@ -55,10 +55,12 @@ pub struct Exchange {
     request_body = Exchange,
     responses(
         (status = 200, description = "Successful TOTP exchange", body = models::Session),
-        (status = 400, description = "Invalid TOTP code or flow"),
-        (status = 401, description = "Not logged in"),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
+        (status = 404, description = "The TOTP exchange flow was not found"),
     ),
-    tag = "totp"
+    tag = TOTP_TAG
 )]
 async fn exchange_login(
     State(global): State<Arc<GlobalState>>,
@@ -158,17 +160,19 @@ async fn exchange_login(
 }
 
 /// Exchange a Link ID to finalize a TOTP request flow
-// TODO: this should really be focused on enabling sudo.
+// TODO: this shouldn't really be focused on enabling sudo.
 #[utoipa::path(
     post,
     path = "/exchange",
     request_body = Exchange,
     responses(
         (status = 200, description = "Successful TOTP exchange"),
-        (status = 400, description = "Invalid TOTP code or flow"),
-        (status = 401, description = "Not logged in"),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
+        (status = 404, description = "The TOTP exchange flow was not found"),
     ),
-    tag = "totp"
+    tag = TOTP_TAG
 )]
 async fn exchange(
     State(global): State<Arc<GlobalState>>,
@@ -180,9 +184,14 @@ async fn exchange(
         return Err(ApiError::YouAreNotLoggedIn);
     }
 
-    let Some(user) = User::get(session.user_id(), &global.database).await? else {
+    let Some(mut user) = User::get(session.user_id(), &global.database).await? else {
         return Err(ApiError::InvalidLogin);
     };
+
+    if user.totp_secret.is_none() {
+        return Err(ApiError::InvalidLogin); // yup. extra check just so there's a bug in another place
+    }
+
     let flow_id = request.link_id;
 
     let flow = AuthFlow::get(
@@ -196,10 +205,30 @@ async fn exchange(
     .await?;
 
     if let Some(AuthFlow::TotpExchange { secret, .. }) = flow {
-        let totp = get_totp_client(&totp_rs::Secret::Encoded(secret));
+        if TOTP_CODE_REGEX.is_match(&request.code_or_recovery) {
+            let totp = get_totp_client(&totp_rs::Secret::Encoded(secret));
 
-        if !totp.check_current(&request.code_or_recovery)? {
-            return Err(ApiError::InvalidTOTPCode(request.code_or_recovery));
+            if !totp.check_current(&request.code_or_recovery)? {
+                return Err(ApiError::InvalidTOTPCode(request.code_or_recovery));
+            }
+        } else {
+            let recovery_codes =
+                get_totp_recovery_codes(user.totp_recovery_secret.as_ref().unwrap());
+
+            if let Some(idx) = recovery_codes
+                .iter()
+                .position(|code| code == &request.code_or_recovery.to_uppercase())
+            {
+                if user.is_recovery_code_used(idx) {
+                    return Err(ApiError::UsedRecoveryCode(request.code_or_recovery));
+                } else if user.remaining_recovery_codes() == 0 {
+                    return Err(ApiError::UsedRecoveryCode(request.code_or_recovery)); // womp womp
+                }
+
+                user.mark_recovery_code_used(idx);
+            } else {
+                return Err(ApiError::InvalidRecoveryCode(request.code_or_recovery));
+            }
         }
 
         AuthFlow::remove(
@@ -239,16 +268,16 @@ pub struct EnableResponse {
     recovery_codes: Vec<String>,
 }
 
-/// The first step to enable TOTP for an account
+/// Start the TOTP enable flow
 #[utoipa::path(
     post,
     path = "/enable",
     responses(
         (status = 200, description = "Enable TOTP response", body = EnableResponse),
-        (status = 400, description = "TOTP already enabled or invalid login"),
-        (status = 401, description = "Not logged in")
+        (status = 400, description = "Validation or parsing error"),
+        (status = 401, description = "Not authenticated"),
     ),
-    tag = "totp"
+    tag = TOTP_TAG
 )]
 async fn enable(
     State(global): State<Arc<GlobalState>>,
@@ -315,17 +344,19 @@ pub struct EnableExchange {
     code: String,
 }
 
-/// The final step to enable TOTP for an account
+/// Exchange the Link ID to finalize enabling TOTP
 #[utoipa::path(
     post,
     path = "/enable/exchange",
     request_body = EnableExchange,
     responses(
         (status = 200, description = "TOTP enabled successfully"),
-        (status = 400, description = "Invalid code or flow"),
-        (status = 401, description = "Not logged in")
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
+        (status = 404, description = "The TOTP enable flow was not found"),
     ),
-    tag = "totp"
+    tag = TOTP_TAG
 )]
 async fn enable_exchange(
     State(global): State<Arc<GlobalState>>,

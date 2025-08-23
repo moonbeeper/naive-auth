@@ -111,9 +111,12 @@ impl Session {
         ids: Vec<SessionId>,
         transaction: &mut PgTransaction<'_>,
     ) -> DatabaseError<()> {
-        sqlx::query!("delete from sessions where id = any($1)", &ids as &[SessionId]) // attrocity
-            .execute(&mut **transaction)
-            .await?;
+        sqlx::query!(
+            "delete from sessions where id = any($1)",
+            &ids as &[SessionId]
+        ) // attrocity
+        .execute(&mut **transaction)
+        .await?;
 
         Ok(())
     }

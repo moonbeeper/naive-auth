@@ -34,7 +34,7 @@ use crate::{
     email::resources::AuthEmails,
     global::GlobalState,
     http::{
-        HttpResult,
+        HttpResult, PASSWORD_TAG,
         error::ApiError,
         v1::{JsonEither, models, string_trim},
     },
@@ -58,7 +58,9 @@ pub struct LoginPassword {
     password: String,
 }
 
-/// Login via user login or email and password. If you have TOTP enabled, a TOTP exchange Link ID will be returned
+/// Login via user login or email and password
+///
+/// Simple login with password. If the user has TOTP enabled, you'll get a TOTP challenge instead of a session.
 #[utoipa::path(
     post,
     path = "/login",
@@ -67,7 +69,7 @@ pub struct LoginPassword {
         (status = 200, description = "Successful login, session or TOTP challenge", body = JsonEither<models::Session, TotpResponse<'static>>),
         (status = 400, description = "Bad request (invalid login, email not verified, etc)"),
     ),
-    tag = "password",
+    tag = PASSWORD_TAG,
     operation_id = "authPasswordLogin"
 )]
 async fn login(
@@ -153,7 +155,9 @@ pub struct RegisterPassword {
     password: String,
 }
 
-/// Register via email, login and password
+/// Register via email and password
+///
+/// Register a new user with the provided email, password and login. You'll need to verify your email after registering.
 #[utoipa::path(
     post,
     path = "/register",
@@ -162,7 +166,7 @@ pub struct RegisterPassword {
         (status = 200, description = "Account registered, verify your email lol"),
         (status = 400, description = "Invalid input or already exists"),
     ),
-    tag = "password"
+    tag = PASSWORD_TAG
 )]
 async fn register(
     State(global): State<Arc<GlobalState>>,
@@ -228,22 +232,18 @@ pub struct ResetPassword {
     email: String,
 }
 
-// #[derive(Debug, serde::Serialize, ToSchema)] // should be only sent via email
-// pub struct ResetPasswordResponse {
-//     link_id: FlowId,
-// }
-
 // this is practically a duplicate of the otp flow but focused on resetting a password.
-/// Send a password reset link to the user's email to begin the flow
+/// Start the password reset flow
+///
+/// This will send a password reset link to the user's email to begin the password reset flow
 #[utoipa::path(
     post,
     path = "/reset",
     request_body = ResetPassword,
     responses(
         (status = 200, description = "Started the password reset flow, check your email"),
-        (status = 400, description = "Invalid login, email not verified, etc."),
     ),
-    tag = "password"
+    tag = PASSWORD_TAG
 )]
 async fn reset_password(
     State(global): State<Arc<GlobalState>>,
@@ -272,7 +272,10 @@ async fn reset_password(
     .await?;
 
     let reset_url = format!("{}/reset/{flow_id}", global.settings.http.app_url); // frontend should handle this
-    let email = AuthEmails::PasswordReset { reset_url };
+    let email = AuthEmails::PasswordReset {
+        reset_url,
+        raw_code: flow_id.to_string(),
+    };
     global.mailer.send(&user.email, email).await?;
 
     Ok(())
@@ -296,7 +299,7 @@ pub struct ResetPasswordStatus {
     status: ResetStatus,
 }
 // useless in an aspect, but useful in the other. or that's what i think haha
-/// Get the path to reset the password. It maybe be either necessary to go through the TOTP flow or not. (depends if the user has TOTP enabled)
+/// Get the available options to reset the password.
 #[utoipa::path(
     get,
     path = "/reset/{id}",
@@ -304,10 +307,11 @@ pub struct ResetPasswordStatus {
         ("id" = FlowId, description = "The ID of the reset password flow")
     ),
     responses(
-        (status = 200, description = "Reset password Link ID", body = ResetPasswordStatus),
-        (status = 400, description = "Invalid login, email not verified, etc."),
+        (status = 200, description = "The current status of the reset password flow", body = ResetPasswordStatus),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 404, description = "The reset password flow was not found"),
     ),
-    tag = "password"
+    tag = PASSWORD_TAG
 )]
 async fn reset_password_status(
     State(global): State<Arc<GlobalState>>,
@@ -346,7 +350,9 @@ pub struct ResetPasswordCheck {
     code_or_recovery: String,
 }
 
-/// Used to get through the TOTP flow to verify the Reset Password flow
+/// Verify the TOTP code or recovery code to continue the password reset flow.
+///
+/// If the user doesn't have TOTP enabled, it will just return OK lol
 #[utoipa::path(
     post,
     path = "/reset/{id}/verify",
@@ -355,12 +361,13 @@ pub struct ResetPasswordCheck {
         ("id" = FlowId, description = "The ID of the reset password flow")
     ),
     responses(
-        (status = 200, description = "Successfully verified the flow"),
-        (status = 400, description = "Invalid login, email not verified, etc."),
+        (status = 200, description = "Successfully verified the recovery flow"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
+        (status = 404, description = "The reset password flow was not found"),
     ),
-    tag = "password"
+    tag = PASSWORD_TAG
 )]
-#[axum::debug_handler]
 async fn reset_password_check(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
@@ -457,7 +464,9 @@ pub struct ResetPasswordExchange {
     password_confirm: String,
 }
 
-/// Set the new password for the user. If the user has TOTP enabled, you'll need to run through the TOTP flow first or else the flow will be deleted.
+/// Set the new password for the user
+///
+/// If the user has TOTP enabled, you'll need to run through the TOTP flow first or else the flow will be deleted.
 #[utoipa::path(
     put,
     path = "/reset/{id}/set",
@@ -467,9 +476,11 @@ pub struct ResetPasswordExchange {
     ),
     responses(
         (status = 200, description = "Successfully set the new password"),
-        (status = 400, description = "Invalid login, email not verified, etc."),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
+        (status = 404, description = "The reset password flow was not found"),
     ),
-    tag = "password"
+    tag = PASSWORD_TAG
 )]
 async fn reset_password_set(
     State(global): State<Arc<GlobalState>>,

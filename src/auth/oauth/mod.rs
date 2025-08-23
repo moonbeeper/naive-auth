@@ -39,7 +39,7 @@ pub enum OauthErrorKind {
     #[error(
         "The provided authorization grant is invalid, expired, revoked, or was issued to another client."
     )]
-    InvalidGrant, // unused
+    InvalidGrant,
     #[error("We do not support this grant type")]
     UnsupportedGrantType,
     #[error(transparent)]

@@ -37,16 +37,18 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
         .nest("/session", session::routes())
         .nest("/sudo", sudo::routes())
         .routes(routes!(get_user))
+        .routes(routes!(funny))
 }
 
-/// Get info about the current user authenticated by a session or via a oauth2 token
+/// Get current user info
+///
+/// Get's the info about the current user that's authenticated via a session or via an oauth2 access token.
 #[utoipa::path(
     get,
     path = "/user",
     responses(
         (status = 200, description = "User info", body = models::User),
-        (status = 401, description = "Unauthorized"),
-        (status = 400, description = "Invalid request or login")
+        (status = 401, description = "Not authenticated"),
     ),
 )]
 async fn get_user(
@@ -67,13 +69,27 @@ async fn get_user(
     let user_id = get_user_id(&auth_context, &oauth_context);
     let Some(user) = User::get(user_id, &global.database).await? else {
         remove_session(auth_context, &cookies, &global).await?;
-        return Err(ApiError::InvalidLogin);
+        return Err(ApiError::InvalidLogin); // todo: check use of this error
     };
 
     Ok(Json(models::User::from(user).remove_user(
         !auth_context.is_authenticated()
             && !oauth_context.has_scopes(&vec![OauthScope::USER_EMAIL]),
     )))
+}
+
+/// teapot endpoint
+///
+/// haha funny teapot woooo
+#[utoipa::path(
+    get,
+    path = "/fun",
+    responses(
+        (status = 418, description = "I'm a teapot :D")
+    ),
+)]
+async fn funny() -> HttpResult<()> {
+    Err(ApiError::Teapot)
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]

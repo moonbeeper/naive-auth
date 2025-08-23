@@ -25,6 +25,15 @@ mod v1;
 
 pub type HttpResult<T> = Result<T, error::ApiError>;
 
+// quite ugly, isn't it?
+pub const AUTH_TAG: &str = "Auth";
+pub const OAUTH_TAG: &str = "OAuth";
+pub const TOTP_TAG: &str = "Totp";
+pub const PASSWORD_TAG: &str = "Password";
+pub const OTP_TAG: &str = "Otp";
+pub const SESSION_TAG: &str = "Session";
+pub const SUDO_TAG: &str = "Sudo";
+
 #[derive(OpenApi)]
 #[openapi(
     security(
@@ -33,12 +42,13 @@ pub type HttpResult<T> = Result<T, error::ApiError>;
     ),
     modifiers(&WhyUtoipa),
     tags(
-        (name = "auth", description = "General authentication endpoints"),
-        (name = "oauth", description = "OAuth2 related endpoints"),
-        (name = "totp", description = "TOTP related endpoints"),
-        (name = "password", description = "Password Authentication endpoints"),
-        (name = "otp", description = "One-Time Passcode Authentication endpoints"),
-        (name = "session", description = "Session related endpoints"),
+        (name = AUTH_TAG, description = "General authentication related endpoints"),
+        (name = OAUTH_TAG, description = "OAuth2 related endpoints"),
+        (name = TOTP_TAG, description = "TOTP related endpoints"),
+        (name = PASSWORD_TAG, description = "Password Authentication endpoints"),
+        (name = OTP_TAG, description = "One-Time Passcode Authentication endpoints"),
+        (name = SESSION_TAG, description = "Session related endpoints"),
+        (name = SUDO_TAG, description = "Endpoints related to Sudo mode"),
         (name = "default", description = "Uncategorized"),
     )
 )]
@@ -82,7 +92,7 @@ pub async fn run(
     let listener = socket.listen(1024)?;
 
     let router = routes(&global).split_for_parts();
-    let router = if global.settings.http.swagger_ui {
+    let router = if global.settings.http.api_explorer {
         router
             .0
             .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", router.1.clone()))

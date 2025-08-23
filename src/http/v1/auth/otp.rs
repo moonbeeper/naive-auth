@@ -25,7 +25,7 @@ use crate::{
     email::resources::AuthEmails,
     global::GlobalState,
     http::{
-        HttpResult,
+        HttpResult, OTP_TAG,
         error::ApiError,
         v1::{JsonEither, models},
     },
@@ -49,16 +49,19 @@ pub struct AuthResponse {
     link_id: FlowId,
 }
 
-/// Login or register via a code! (If the account isn't found, it will start the register flow)
+/// Login or register
+///
+/// This will send a code to the provided email address to either login or register
 #[utoipa::path(
     post,
     path = "/login",
     request_body = Login,
     responses(
         (status = 200, description = "Login flow started", body = AuthResponse),
-        (status = 400, description = "Invalid login, email not verified, etc."),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
     ),
-    tag = "otp",
+    tag = OTP_TAG,
     operation_id = "authOtpLogin"
 )]
 async fn login(
@@ -146,7 +149,7 @@ pub struct AuthExchange {
     code: String,
 }
 
-/// Exchange the OTP code sent to the user's email for a session
+/// Exchange the code sent to the user's email for a session
 #[allow(clippy::too_many_lines)] // leave me alone please
 #[utoipa::path(
     post,
@@ -154,9 +157,10 @@ pub struct AuthExchange {
     request_body = AuthExchange,
     responses(
         (status = 200, description = "Exchanged for session or TOTP challenge", body = JsonEither<models::Session, TotpResponse>),
-        (status = 400, description = "Invalid code or login"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
     ),
-    tag = "otp",
+    tag = OTP_TAG,
     operation_id = "authOtpExchangeLogin"
 )]
 async fn exchange_login(
@@ -286,17 +290,20 @@ async fn exchange_login(
     Err(ApiError::InvalidLogin)
 }
 
-/// Exchange the OTP code sent to the user's email to finish a otp exchange flow
-// TODO: this should really be focused on enabling sudo.
+/// Exchange the OTP code sent to the user's email to finish a flow
+// TODO: this shouldn't really be focused on enabling sudo.
 #[utoipa::path(
     post,
     path = "/exchange",
     request_body = AuthExchange,
     responses(
         (status = 200, description = "Successful OTP exchange"),
-        (status = 400, description = "Invalid code or login"),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 404, description = "OTP exchange flow not found"),
+        (status = 422, description = "Missing required fields"),
     ),
-    tag = "otp",
+    tag = OTP_TAG,
     operation_id = "authOtpExchange"
 )]
 async fn exchange(

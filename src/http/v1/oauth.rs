@@ -27,7 +27,7 @@ use crate::{
         string_id::StringId,
     },
     global::GlobalState,
-    http::{HttpResult, error::ApiError, v1::models},
+    http::{HttpResult, OAUTH_TAG, error::ApiError, v1::models},
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -69,11 +69,12 @@ struct CreateAppResponse {
     path = "/apps",
     request_body = CreateApp,
     responses(
-        (status = 200, description = "App created", body = CreateAppResponse),
-        (status = 401, description = "Not logged in"),
-        (status = 400, description = "Validation or other error")
+        (status = 200, description = "OAuth app created", body = CreateAppResponse),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn create_app(
     State(global): State<Arc<GlobalState>>,
@@ -144,11 +145,13 @@ struct AppParam {
         ("id" = OauthAppId, description = "The ID of the OAuth app to delete")
     ),
     responses(
-        (status = 200, description = "App deleted"),
-        (status = 401, description = "Not logged in"),
-        (status = 400, description = "Validation or other error")
+        (status = 200, description = "OAuth app deleted"),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 404, description = "OAuth app not found"),
+        (status = 403, description = "OAuth app not owned by the user"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn delete_app(
     State(global): State<Arc<GlobalState>>,
@@ -183,16 +186,19 @@ async fn delete_app(
 struct UpdateApp {
     // #[validate(length(equal = 32))]
     // id: OauthAppId,
+    #[schema(example = "My new OAuth app name")]
     #[validate(length(min = 6, max = 32))]
     name: Option<String>,
+    #[schema(example = "My new OAuth app description")]
     #[validate(length(max = 256))] // dunno
     description: Option<String>,
     scopes: Option<Vec<String>>,
+    #[schema(example = "https://oauthdebugger.com/debug")]
     #[validate(url)]
     callback_url: Option<String>,
 }
 
-/// Update an OAuth app by its ID
+/// Update an OAuth app
 #[utoipa::path(
     put,
     path = "/apps/{id}",
@@ -200,11 +206,13 @@ struct UpdateApp {
         ("id" = OauthAppId, description = "The ID of the OAuth app to update")
     ),
     responses(
-        (status = 200, description = "App updated"),
-        (status = 401, description = "Not logged in"),
-        (status = 400, description = "Validation or other error")
+        (status = 200, description = "OAuth app updated"),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 404, description = "OAuth app not found"),
+        (status = 403, description = "OAuth app not owned by the user"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn update_app(
     State(global): State<Arc<GlobalState>>,
@@ -250,6 +258,7 @@ async fn update_app(
     if let Some(callback_url) = request.callback_url {
         app.callback_url = callback_url;
     }
+
     let mut tx = global.database.begin().await?;
     OauthApp::delete(&param.id, &mut tx).await?;
     tx.commit().await?;
@@ -262,10 +271,10 @@ async fn update_app(
     get,
     path = "/apps",
     responses(
-        (status = 200, description = "List user created oauth apps", body = [models::OauthApp]),
-        (status = 401, description = "Not logged in")
+        (status = 200, description = "A list of the user created OAuth apps", body = [models::OauthApp]),
+        (status = 401, description = "Not authenticated"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn list_apps(
     State(global): State<Arc<GlobalState>>,
@@ -291,10 +300,10 @@ async fn list_apps(
     get,
     path = "/authorized",
     responses(
-        (status = 200, description = "List user's authorized oauth apps", body = [models::OauthAuthorized]),
-        (status = 401, description = "Not logged in")
+        (status = 200, description = "A list of the authorized OAuth apps", body = [models::OauthAuthorized]),
+        (status = 401, description = "Not authenticated"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn list_authorized(
     State(global): State<Arc<GlobalState>>,
@@ -324,7 +333,7 @@ struct AuthorizedParam {
     id: OauthAuthorizedId,
 }
 
-/// Delete an authorized OAuth app by its id
+/// Delete an authorized OAuth app
 #[utoipa::path(
     delete,
     path = "/authorized/{id}",
@@ -332,11 +341,12 @@ struct AuthorizedParam {
         ("id" = OauthAuthorizedId, description = "The ID of the authorized OAuth app to delete")
     ),
     responses(
-        (status = 200, description = "Authorization removed"),
-        (status = 401, description = "Not logged in"),
-        (status = 400, description = "Validation or other error")
+        (status = 200, description = "Successfully removed authorized OAuth app"),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 404, description = "Authorized OAuth app not found"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn remove_authorized(
     State(global): State<Arc<GlobalState>>,
@@ -375,11 +385,12 @@ async fn remove_authorized(
         ("id" = OauthAuthorizedId, description = "The ID of the authorized OAuth app to get")
     ),
     responses(
-        (status = 200, description = "Get authorized app", body = models::OauthAuthorized),
-        (status = 401, description = "Not logged in"),
-        (status = 400, description = "Validation or other error")
+        (status = 200, description = "The authorized OAuth app info", body = models::OauthAuthorized),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 404, description = "Authorized OAuth app not found"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn get_authorized(
     State(global): State<Arc<GlobalState>>,
@@ -414,11 +425,12 @@ async fn get_authorized(
         ("id" = OauthAppId, description = "The ID of the OAuth app to retrieve")
     ),
     responses(
-        (status = 200, description = "Get authorized app", body = models::OauthApp),
-        (status = 401, description = "Not logged in"),
-        (status = 400, description = "Validation or other error")
+        (status = 200, description = "The OAuth app info", body = models::OauthApp),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 404, description = "OAuth app not found"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn get_app(
     State(global): State<Arc<GlobalState>>,

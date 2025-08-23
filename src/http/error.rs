@@ -98,6 +98,7 @@ pub enum ApiError {
     RecoveryLinkNotFound,
 }
 
+// todo: go through all errors and make sure they have proper status codes
 impl ApiError {
     #[allow(clippy::match_same_arms)]
     pub const fn status_code(&self) -> axum::http::StatusCode {
@@ -123,17 +124,17 @@ impl ApiError {
             Self::OTPRecoveryFlowNotFound => axum::http::StatusCode::NOT_FOUND,
             Self::TOTPFlowNotFound => axum::http::StatusCode::NOT_FOUND,
             Self::EmailIsNotVerified => axum::http::StatusCode::UNAUTHORIZED,
-            Self::EmailIsAlreadyVerified => axum::http::StatusCode::BAD_REQUEST,
+            Self::EmailIsAlreadyVerified => axum::http::StatusCode::CONFLICT,
             Self::InvalidEmailVerification => axum::http::StatusCode::BAD_REQUEST,
             Self::InvalidAuthentication => axum::http::StatusCode::UNAUTHORIZED,
             Self::FailedParsingScopes(_) => axum::http::StatusCode::BAD_REQUEST,
             Self::OAuthAppNotFound(_) => axum::http::StatusCode::NOT_FOUND,
-            Self::OAuthAppNotOwned(_) => axum::http::StatusCode::BAD_REQUEST,
+            Self::OAuthAppNotOwned(_) => axum::http::StatusCode::FORBIDDEN,
             Self::OAuthAppEmptyScopes => axum::http::StatusCode::BAD_REQUEST,
             Self::OAuthAuthorizationNotFound(_) => axum::http::StatusCode::NOT_FOUND,
             Self::SudoIsNotEnabled => axum::http::StatusCode::UNAUTHORIZED,
             Self::SudoIsAlreadyEnabled => axum::http::StatusCode::BAD_REQUEST,
-            Self::SudoCannotBeEnabled => axum::http::StatusCode::BAD_REQUEST,
+            Self::SudoCannotBeEnabled => axum::http::StatusCode::FORBIDDEN,
             Self::TOTPExchangeNotFound(_) => axum::http::StatusCode::NOT_FOUND,
             Self::OTPExchangeNotFound(_) => axum::http::StatusCode::NOT_FOUND,
             Self::SessionDoesNotExist(_) => axum::http::StatusCode::NOT_FOUND,

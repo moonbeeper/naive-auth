@@ -13,7 +13,7 @@ pub struct HttpSettings {
     #[default("http://localhost:8080")]
     pub origin: String,
     #[default(true)]
-    pub swagger_ui: bool,
+    pub api_explorer: bool,
     #[default("https://localhost:8080")]
     pub app_url: String,
 }

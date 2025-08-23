@@ -18,7 +18,7 @@ use crate::{
         },
     },
     global::GlobalState,
-    http::{HttpResult, error::ApiError, v1::auth::CurrentActiveOptions},
+    http::{HttpResult, SUDO_TAG, error::ApiError, v1::auth::CurrentActiveOptions},
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -37,6 +37,7 @@ pub enum SudoEnableOption {
 
 #[derive(Debug, serde::Deserialize, ToSchema)]
 pub struct SudoEnableRequest {
+    #[schema(example = "otp")]
     option: SudoEnableOption,
 }
 
@@ -45,15 +46,21 @@ pub struct SudoEnableResponse {
     option: SudoEnableOption,
     link_id: FlowId,
 }
-/// Start the requested flow for enabling sudo for the current session
+/// Enable sudo for the current session
+///
+/// This will start the requested flow to enable sudo
 #[utoipa::path(
     post,
     path = "/",
     responses(
-        (status = 200, description = "Sudo enabled", body = SudoEnableResponse),
+        (status = 200, description = "Sudo has been enabled", body = SudoEnableResponse),
         (status = 401, description = "Not authenticated"),
+        // I don't know if I want to mention a sudo err here
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
+        (status = 403, description = "Sudo cannot be enabled with the chosen option"),
     ),
-    tag = "sudo"
+    tag = SUDO_TAG
 )]
 async fn enable_sudo(
     State(global): State<Arc<GlobalState>>,
@@ -137,10 +144,10 @@ async fn enable_sudo(
     get,
     path = "/",
     responses(
-        (status = 200, description = "Sudo enable options", body = CurrentActiveOptions),
+        (status = 200, description = "The available Sudo enable options", body = CurrentActiveOptions),
         (status = 401, description = "Not authenticated"),
     ),
-    tag = "sudo"
+    tag = SUDO_TAG
 )]
 async fn get_sudo_options(
     State(global): State<Arc<GlobalState>>,
@@ -170,15 +177,15 @@ struct SudoStatus {
     enabled: bool,
 }
 
-/// Get the current sudo status of the session
+/// Get the sudo status of the session
 #[utoipa::path(
     get,
     path = "/status",
     responses(
-        (status = 200, description = "Sudo status", body = SudoStatus),
+        (status = 200, description = "The current Sudo status", body = SudoStatus),
         (status = 401, description = "Not authenticated"),
     ),
-    tag = "sudo"
+    tag = SUDO_TAG
 )]
 async fn get_sudo_status(
     State(global): State<Arc<GlobalState>>,

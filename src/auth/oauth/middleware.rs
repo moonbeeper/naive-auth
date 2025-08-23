@@ -134,13 +134,9 @@ impl<S: Send + Sync + 'static> OauthManagerMiddleware<S> {
             return Ok(OauthContext::Empty);
         };
 
-        println!("aaa: {authorization:?}");
-
         let Ok(authorization) = authorization.to_str() else {
             return Err(ApiError::InvalidAuthentication);
         };
-
-        println!("aaaaa: {authorization:?}");
 
         // Check that its a well-formed bearer and return
         let split = authorization.split_once(' ');
@@ -158,10 +154,7 @@ impl<S: Send + Sync + 'static> OauthManagerMiddleware<S> {
             .strip_prefix(&format!("{}_", self.global.settings.oauth.token_prefix))
             .ok_or(ApiError::InvalidAuthentication)?;
 
-        println!("striped: {token_id:?}");
-
         let token = blake3::hash(token_id.as_bytes()).to_hex();
-        println!("hashed: {token:?}");
 
         let Some(token) = OauthAuthorized::get_token(token.as_str(), &self.global.database).await?
         else {

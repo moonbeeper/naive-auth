@@ -15,7 +15,7 @@ use crate::{
     },
     email::resources::AuthEmails,
     global::GlobalState,
-    http::{HttpResult, error::ApiError},
+    http::{AUTH_TAG, HttpResult, PASSWORD_TAG, error::ApiError},
 };
 
 pub mod oauth;
@@ -41,17 +41,20 @@ pub struct VerifyEmail {
     code: String,
 }
 
-/// Verify the user's email to be able to login with email or user login and password
+/// Verify an email address
+///
+/// This will verify the email address of a user, allowing them to login with password.
 #[utoipa::path(
     post,
     path = "/verify",
     request_body = VerifyEmail,
     responses(
-        (status = 200, description = "Email verified"),
-        (status = 400, description = "Invalid code"),
-        (status = 401, description = "Not authenticated")
+        (status = 200, description = "Email verified successfully"),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 409, description = "Email has been already verified"),
     ),
-    tag = "password"
+    tag = PASSWORD_TAG
 )]
 async fn verify_email(
     State(global): State<Arc<GlobalState>>,
@@ -116,7 +119,7 @@ pub struct CurrentActiveOptions {
         (status = 200, description = "Signed out"),
         (status = 401, description = "Not authenticated"),
     ),
-    tag = "auth"
+    tag = AUTH_TAG
 )]
 async fn signout(
     State(global): State<Arc<GlobalState>>,

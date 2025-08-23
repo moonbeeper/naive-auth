@@ -36,7 +36,7 @@ use crate::{
     },
     email::resources::AuthEmails,
     global::GlobalState,
-    http::error::ApiError,
+    http::{OAUTH_TAG, error::ApiError},
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -51,7 +51,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
 pub enum OauthResponseType {
     Code,
     Token,
-    #[serde(rename = "token code")]
+    #[serde(rename = "token code")] // I hate this
     Hybrid,
     #[serde(rename = "code token")]
     Hybrid2,
@@ -84,16 +84,20 @@ pub struct PreAuthorizeResponse {
     scopes: Vec<String>,
 }
 
-/// Get the Link ID to be able to authorize or refuse authorization for the OAuth client
+/// Start the OAuth authorization process
+///
+/// This will return a Link ID with the requested scopes to be authorized or refused by the user
 #[utoipa::path(
     get,
     path = "/authorize",
     params(PreAuthorize),
     responses(
-        (status = 200, description = "Authorization needed", body = PreAuthorizeResponse),
-        (status = 400, description = "Invalid request or not authenticated")
+        (status = 200, description = "Pre-authorization response", body = PreAuthorizeResponse),
+        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn pre_authorize(
     State(global): State<Arc<GlobalState>>,
@@ -203,16 +207,18 @@ pub struct AuthorizeResponse {
     iss: String,
 }
 
-/// Exchange the Link ID to authorize or refuse authorizing a OAuth client
+/// Exchange the Link ID to authorize or deny the OAuth request
 #[utoipa::path(
     post,
     path = "/authorize",
     request_body = Authorize,
     responses(
-        (status = 200, description = "Authorization approved", body = AuthorizeResponse),
-        (status = 400, description = "Invalid request or not authenticated")
+        (status = 303, description = "OAuth authorization approved"),
+        (status = 401, description = "Not authenticated or access denied by the user"),
+        (status = 400, description = "Validation or parsing error"),
+        (status = 422, description = "Missing required fields"),
     ),
-    tag = "oauth"
+    tag = OAUTH_TAG
 )]
 async fn authorize(
     State(global): State<Arc<GlobalState>>,
@@ -303,16 +309,17 @@ pub struct ExchangeResponse {
     scope: String,
 }
 
-/// Exchange a code for a Bearer access token
+/// Exchange a OAuth code for a access token
 #[utoipa::path(
     post,
     path = "/token",
     request_body = ExchangeRequest,
     responses(
         (status = 200, description = "OAuth token exchanged", body = ExchangeResponse),
-        (status = 400, description = "Invalid request or client")
+        (status = 400, description = "Validation or parsing error"), // I don't know if I need to be more descriptive
+        (status = 422, description = "Missing required fields"),
     ),
-    tag = "oauth",
+    tag = OAUTH_TAG,
     operation_id = "authOauthToken"
 )]
 async fn exchange(
@@ -420,7 +427,6 @@ fn validate_uri(requested: &str, stored: &str) -> Result<(), OauthErrorKind> {
 
 fn is_localhost(uri: &Url) -> bool {
     match uri.host() {
-        // TODO: Should have ipv6?
         Some(url::Host::Domain("localhost")) => true,
         Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
         Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
@@ -460,5 +466,5 @@ async fn create_token_request(
     };
     let uri = Url::parse(&uri).map_err(|_| OauthErrorKind::FailedMakingUrl)?;
 
-    Ok(Redirect::temporary(uri.to_string().as_str()))
+    Ok(Redirect::to(uri.to_string().as_str()))
 }

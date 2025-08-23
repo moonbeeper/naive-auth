@@ -65,6 +65,7 @@ pub enum AuthEmails {
     },
     PasswordReset {
         reset_url: String,
+        raw_code: String,
     },
 }
 
@@ -139,8 +140,12 @@ impl EmailResource for AuthEmails {
             Self::TotpDisabled { login } => {
                 context.insert("login", login);
             }
-            Self::PasswordReset { reset_url } => {
+            Self::PasswordReset {
+                reset_url,
+                raw_code,
+            } => {
                 context.insert("reset_url", reset_url);
+                context.insert("raw_code", &raw_code);
             }
         }
         context
