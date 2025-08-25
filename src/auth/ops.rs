@@ -100,7 +100,7 @@ pub fn create_session(
     let cookie = build_cookie(
         settings.session.cookie_name.clone(),
         settings.session.inactive_age,
-        settings.http.domain.clone(),
+        settings.session.secure_cookies,
         ticket,
     );
 
@@ -110,13 +110,14 @@ pub fn create_session(
 pub fn build_cookie(
     cookie_name: String,
     max_age: i64,
-    domain: String,
+    secure: bool,
     data: String,
 ) -> Cookie<'static> {
     Cookie::build((cookie_name, data))
         .path("/")
         .http_only(true)
-        .domain(domain)
+        .secure(secure)
+        .same_site(tower_cookies::cookie::SameSite::Lax)
         .max_age(tower_cookies::cookie::time::Duration::seconds(max_age))
         .into()
 }

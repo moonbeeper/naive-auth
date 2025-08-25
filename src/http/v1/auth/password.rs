@@ -271,7 +271,7 @@ async fn reset_password(
     )
     .await?;
 
-    let reset_url = format!("{}/reset/{flow_id}", global.settings.http.app_url); // frontend should handle this
+    let reset_url = format!("{}/reset/{flow_id}", global.settings.http.frontend_url); // frontend should handle this
     let email = AuthEmails::PasswordReset {
         reset_url,
         raw_code: flow_id.to_string(),

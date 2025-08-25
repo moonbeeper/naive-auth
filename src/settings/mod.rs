@@ -8,14 +8,12 @@ pub mod cli;
 pub struct HttpSettings {
     #[default(SocketAddr::from(([127, 0, 0, 1], 8080)))]
     pub bind: SocketAddr,
-    #[default("localhost")] // https://stackoverflow.com/a/78783439
-    pub domain: String,
-    #[default("http://localhost:8080")]
+    #[default("http://127.0.0.1:8080")]
     pub origin: String,
     #[default(true)]
     pub api_explorer: bool,
-    #[default("https://localhost:8080")]
-    pub app_url: String,
+    #[default("https://127.0.0.1:8081")]
+    pub frontend_url: String,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]
@@ -37,6 +35,8 @@ pub struct SessionSettings {
     pub active_age: i64,
     #[default(60*60*24*30)]
     pub inactive_age: i64,
+    #[default(false)]
+    pub secure_cookies: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]

@@ -125,7 +125,7 @@ impl<S: Send + Sync + 'static> AuthManagerMiddleware<S> {
             let cookie = build_cookie(
                 cookie_name,
                 self.global.settings.session.inactive_age,
-                self.global.settings.http.domain.clone(),
+                self.global.settings.session.secure_cookies,
                 ticket,
             );
             cookies.add(cookie);
