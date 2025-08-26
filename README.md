@@ -1,25 +1,31 @@
 # Naive auth
 
-Its a pretty simple authentication server that provides login via email and password and OTP with the added bonus of TOTP and email notifications that are totally finished. It also provides support for being an OAuth2 provider.
+Its my try to make an authentication server that is possibly (un)secure. You can log in via password or via OTP and even have 2FA enabled on your account. It can also act as a OAuth 2 provider and has nice email notifications.
 
-To run it you can use the docker composes to first spun up the required stuff (Redis, Postgres, Mailpit):
+To run it you need to use docker composes to first spun up the required stuff (Redis, Postgres, Mailpit):
+
+> Mailpit is the email stmp server that I use in development. You can access it at `http://localhost:8025/`
 
 ```sh
 docker compose up -d
 ```
 
-Then we generate the settings file:
+Then we generate the settings file for the server:
 
 ```sh
 cargo run -- -g
 ```
 
-> The cookie session name isn't reflected in the swagger ui, so better not change it for now. (swagger was practically rushed as the general api was built on top of the normal axum router)
+> The settings file isn't really required, but it's nice to have in development so you don't have to set environment vars with the prefix `BEEP_` with the setting you want to change every single time.
 
-Then you can just run the server with:
+And finally you can just run the server or you can change the settings in the `settings.toml` file... this is the command to start the server:
 
 ```sh
 cargo run
 ```
 
-here should go a beautiful example of how would you log in via otp, but I think its self explanatory.
+The server will be reachable at `http://127.0.0.1:8080/` by default.
+
+The API explorer can be found at `http://127.0.0.1:8080/swagger-ui` if you like swagger OR `http://127.0.0.1:8080/scalar` if you prefer scalar.
+
+> The `api_explorer` setting should be set to true in the settings file or else it won't be available. (By default it's true)
