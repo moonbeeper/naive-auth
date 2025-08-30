@@ -1,36 +1,27 @@
 <script>
-	import Button from '../components/button.svelte';
-	import Input from '../components/input.svelte';
 	import { currentText } from '$lib/bigHeader';
 	import { fade, fly, slide } from 'svelte/transition';
+	import Button from '../../components/button.svelte';
+	import Input from '../../components/input.svelte';
 
-	currentText.set('Log in');
-
-	let passwordMode = $state(false);
+	currentText.set('Sign up');
 </script>
 
 <main>
-	<h1>Log in to your account</h1>
+	<h1>Create a new account</h1>
 	<div class="container">
 		<!-- <div class="test">
 			<label for="">Email address</label>
 			<input type="text" name="lmao" placeholder="beep@example.com" />
 		</div> -->
+		<Input label="Username" name="email" type="text" placeholder="beep@example.com" big />
 		<Input label="Email address" name="email" type="text" placeholder="beep@example.com" big />
-		{#if passwordMode}
-			<!-- thanks cal com -->
-			<Input label="Password" name="password" type="password" placeholder="•••••••••••••" big />
-			<p>
-				or use a <a href="/" onclick={() => (passwordMode = false)}>one-time code</a>
-			</p>
-			<p>
-				Don't have an account yet? <a href="/signup">Sign up</a>
-			</p>
-			<Button big primary full_width>Continue with Password</Button>
-		{:else}
-			<p>or use <a href="/" onclick={() => (passwordMode = true)}>your password</a></p>
-			<Button big primary full_width>Continue with Email</Button>
-		{/if}
+		<!-- thanks cal com -->
+		<Input label="Password" name="password" type="password" placeholder="•••••••••••••" big />
+
+		<p>Already have an account? <a href="/">Log in</a></p>
+
+		<Button big primary full_width>Sign up</Button>
 	</div>
 	<em></em>
 	<div class="container">

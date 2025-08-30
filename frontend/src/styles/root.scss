@@ -1,0 +1,46 @@
+:root {
+    --bg-dark: #0a0a0a;
+    --bg-semidark: #222222;
+    --bg-notdark: #444444;
+    --white: #ededed;
+    --white-darkened: #cccccc;
+
+    --text: var(--white);
+    --text-darkened: #121212;
+    --text-link: #ffd670;
+
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+    font-family: "Manrope Variable", sans-serif;
+    color: var(--text);
+    background-color: var(--bg-dark);
+}
+
+// should this even be here when i have a component for it lol
+input[type="text"],
+input[type="password"] {
+    background-color: var(--bg-dark);
+    padding-left: 0.75rem;
+    width: 100%;
+    font-size: 0.875rem;
+    outline: 0;
+    border: var(--bg-semidark) 0.1rem solid;
+    color: var(--text);
+    border-radius: 10px;
+    font-family: inherit;
+    transition: border-color 0.1s ease-out;
+}
+
+input:focus {
+    border-color: var(--bg-notdark);
+}
+
+a {
+    color: var(--text-link);
+    font-weight: 600;
+}
