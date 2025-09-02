@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::State, http::HeaderMap};
-use axum_valid::Valid;
+use axum::{Extension, extract::State, http::HeaderMap};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -26,8 +25,9 @@ use crate::{
     global::GlobalState,
     http::{
         HttpResult, TOTP_TAG,
-        error::ApiError,
+        error::{ApiError, ApiHttpError},
         v1::{models, string_trim},
+        validation::{Json, Valid},
     },
 };
 
@@ -55,10 +55,10 @@ pub struct Exchange {
     request_body = Exchange,
     responses(
         (status = 200, description = "Successful TOTP exchange", body = models::Session),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
-        (status = 404, description = "The TOTP exchange flow was not found"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
+        (status = 404, description = "The TOTP exchange flow was not found", body = ApiHttpError),
     ),
     tag = TOTP_TAG
 )]
@@ -167,10 +167,10 @@ async fn exchange_login(
     request_body = Exchange,
     responses(
         (status = 200, description = "Successful TOTP exchange"),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
-        (status = 404, description = "The TOTP exchange flow was not found"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError, body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError, body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError, body = ApiHttpError),
+        (status = 404, description = "The TOTP exchange flow was not found", body = ApiHttpError, body = ApiHttpError),
     ),
     tag = TOTP_TAG
 )]
@@ -274,8 +274,8 @@ pub struct EnableResponse {
     path = "/enable",
     responses(
         (status = 200, description = "Enable TOTP response", body = EnableResponse),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 401, description = "Not authenticated"),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = TOTP_TAG
 )]
@@ -351,10 +351,10 @@ pub struct EnableExchange {
     request_body = EnableExchange,
     responses(
         (status = 200, description = "TOTP enabled successfully"),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
-        (status = 404, description = "The TOTP enable flow was not found"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
+        (status = 404, description = "The TOTP enable flow was not found", body = ApiHttpError),
     ),
     tag = TOTP_TAG
 )]

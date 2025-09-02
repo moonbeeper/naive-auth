@@ -10,7 +10,7 @@ any_ascii = "0.3.3"
 anyhow = "1.0.98"
 argon2 = { version = "0.5.3", features = ["std"] }
 axum = { version = "0.8.4", features = ["http2", "macros"] }
-axum-valid = "0.24.0"
+axum-valid = { version = "0.24.0", features = ["into_json"] }
 base32 = "0.5.1"
 base64 = "0.22.1"
 bitflags = { version = "2.9.2", features = ["std"] }

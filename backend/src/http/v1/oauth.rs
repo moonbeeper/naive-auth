@@ -1,11 +1,7 @@
 use std::{str::FromStr, sync::Arc};
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
-use axum::{
-    Extension, Json,
-    extract::{Path, State},
-};
-use axum_valid::Valid;
+use axum::{Extension, extract::State};
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
 use url::Url;
@@ -27,7 +23,12 @@ use crate::{
         string_id::StringId,
     },
     global::GlobalState,
-    http::{HttpResult, OAUTH_TAG, error::ApiError, v1::models},
+    http::{
+        HttpResult, OAUTH_TAG,
+        error::{ApiError, ApiHttpError},
+        v1::models,
+        validation::{Json, Path, Valid},
+    },
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -70,12 +71,13 @@ struct CreateAppResponse {
     request_body = CreateApp,
     responses(
         (status = 200, description = "OAuth app created", body = CreateAppResponse),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
     ),
-    tag = OAUTH_TAG
+    tag = OAUTH_TAG,
 )]
+#[axum::debug_handler]
 async fn create_app(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -146,10 +148,10 @@ struct AppParam {
     ),
     responses(
         (status = 200, description = "OAuth app deleted"),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 404, description = "OAuth app not found"),
-        (status = 403, description = "OAuth app not owned by the user"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 404, description = "OAuth app not found", body = ApiHttpError),
+        (status = 403, description = "OAuth app not owned by the user", body = ApiHttpError),
     ),
     tag = OAUTH_TAG
 )]
@@ -207,10 +209,10 @@ struct UpdateApp {
     ),
     responses(
         (status = 200, description = "OAuth app updated"),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 404, description = "OAuth app not found"),
-        (status = 403, description = "OAuth app not owned by the user"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 404, description = "OAuth app not found", body = ApiHttpError),
+        (status = 403, description = "OAuth app not owned by the user", body = ApiHttpError),
     ),
     tag = OAUTH_TAG
 )]
@@ -272,7 +274,7 @@ async fn update_app(
     path = "/apps",
     responses(
         (status = 200, description = "A list of the user created OAuth apps", body = [models::OauthApp]),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = OAUTH_TAG
 )]
@@ -301,7 +303,7 @@ async fn list_apps(
     path = "/authorized",
     responses(
         (status = 200, description = "A list of the authorized OAuth apps", body = [models::OauthAuthorized]),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = OAUTH_TAG
 )]
@@ -342,9 +344,9 @@ struct AuthorizedParam {
     ),
     responses(
         (status = 200, description = "Successfully removed authorized OAuth app"),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 404, description = "Authorized OAuth app not found"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 404, description = "Authorized OAuth app not found", body = ApiHttpError),
     ),
     tag = OAUTH_TAG
 )]
@@ -386,9 +388,9 @@ async fn remove_authorized(
     ),
     responses(
         (status = 200, description = "The authorized OAuth app info", body = models::OauthAuthorized),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 404, description = "Authorized OAuth app not found"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 404, description = "Authorized OAuth app not found", body = ApiHttpError),
     ),
     tag = OAUTH_TAG
 )]
@@ -426,9 +428,9 @@ async fn get_authorized(
     ),
     responses(
         (status = 200, description = "The OAuth app info", body = models::OauthApp),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 404, description = "OAuth app not found"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 404, description = "OAuth app not found", body = ApiHttpError),
     ),
     tag = OAUTH_TAG
 )]

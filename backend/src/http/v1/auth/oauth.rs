@@ -2,11 +2,10 @@ use std::{str::FromStr, sync::Arc};
 
 use argon2::{Argon2, PasswordHash, PasswordVerifier as _};
 use axum::{
-    Extension, Form, Json,
-    extract::{Query, State},
+    Extension, Form,
+    extract::State,
     response::{IntoResponse as _, Redirect, Response},
 };
-use axum_valid::Valid;
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use sha2::{Digest, Sha256};
 use tower_cookies::Cookies;
@@ -36,7 +35,11 @@ use crate::{
     },
     email::resources::AuthEmails,
     global::GlobalState,
-    http::{OAUTH_TAG, error::ApiError},
+    http::{
+        OAUTH_TAG,
+        error::{ApiError, ApiHttpError},
+        validation::{Json, Query, Valid},
+    },
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -93,9 +96,9 @@ pub struct PreAuthorizeResponse {
     params(PreAuthorize),
     responses(
         (status = 200, description = "Pre-authorization response", body = PreAuthorizeResponse),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "OAuth error, validation or parsing error"),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
     ),
     tag = OAUTH_TAG
 )]
@@ -215,8 +218,8 @@ pub struct AuthorizeResponse {
     responses(
         (status = 303, description = "OAuth authorization approved"),
         (status = 401, description = "Not authenticated or access denied by the user"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
+        (status = 400, description = "OAuth error, validation or parsing error"),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
     ),
     tag = OAUTH_TAG
 )]
@@ -316,8 +319,8 @@ pub struct ExchangeResponse {
     request_body = ExchangeRequest,
     responses(
         (status = 200, description = "OAuth token exchanged", body = ExchangeResponse),
-        (status = 400, description = "Validation or parsing error"), // I don't know if I need to be more descriptive
-        (status = 422, description = "Missing required fields"),
+        (status = 400, description = "OAuth error, validation or parsing error"), // I don't know if I need to be more descriptive
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
     ),
     tag = OAUTH_TAG,
     operation_id = "authOauthToken"

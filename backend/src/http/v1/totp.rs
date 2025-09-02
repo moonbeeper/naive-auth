@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::State};
+use axum::{Extension, extract::State};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -13,7 +13,11 @@ use crate::{
     database::models::{session::Session, user::User},
     email::resources::AuthEmails,
     global::GlobalState,
-    http::{HttpResult, TOTP_TAG, error::ApiError},
+    http::{
+        HttpResult, TOTP_TAG,
+        error::{ApiError, ApiHttpError},
+        validation::Json,
+    },
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -35,8 +39,8 @@ struct TotpRecoveryResponse {
     path = "/recovery",
     responses(
         (status = 200, description = "TOTP Recovery codes", body = TotpRecoveryResponse),
-        (status = 401, description = "Not authenticated or Sudo is not enabled"),
-        (status = 400, description = "Validation or parsing error"),
+        (status = 401, description = "Not authenticated or Sudo is not enabled", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
     ),
     tag = TOTP_TAG
 )]
@@ -84,8 +88,8 @@ async fn get_totp_recovery(
     path = "/",
     responses(
         (status = 200, description = "TOTP disabled successfully"),
-        (status = 401, description = "Not authenticated or Sudo is not enabled"),
-        (status = 400, description = "Validation or parsing error"),
+        (status = 401, description = "Not authenticated or Sudo is not enabled", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
     ),
     tag = TOTP_TAG
 )]

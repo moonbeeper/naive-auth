@@ -12,7 +12,7 @@ pub mod scopes;
 
 pub type OauthHttpResult<T> = Result<T, OauthError>;
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct OauthHttpError<'a> {
     pub error: &'a str,
     pub error_description: String,

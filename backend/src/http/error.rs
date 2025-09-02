@@ -1,9 +1,16 @@
-use axum::{Json, response::IntoResponse};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 
 use crate::database::redis::models::RedisError;
 
-#[derive(Debug, serde::Serialize)]
-struct HttpError<'a> {
+/// An alias to the actual `HttpError`
+pub type ApiHttpError = HttpError<'static>;
+
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct HttpError<'a> {
     pub error: &'a str,
     pub message: String,
 }
@@ -96,59 +103,83 @@ pub enum ApiError {
     PasswordLowStrength,
     #[error("The recovery link you provided was not found or has expired")]
     RecoveryLinkNotFound,
+    #[error("{0}")]
+    ValidationError(String),
+    #[error("{0}")]
+    JsonSyntaxError(String),
+    #[error("{0}")]
+    JsonDataError(String),
+    #[error("Expected request with `Content-Type: application/json`")]
+    MissingJsonContentType,
+    #[error("Failed to buffer the request body")]
+    FailedToBufferContent,
+    #[error("The path parameters couldn't be deserialized because of: {0}")]
+    FailedToDeserializePathParams(String),
+    #[error("No paths parameters found for matched route")]
+    MissingPathParams,
+    #[error("The query parameters couldn't be deserialized because of: {0}")]
+    FailedToDeserializeQuery(String),
 }
 
 // todo: go through all errors and make sure they have proper status codes
 impl ApiError {
     #[allow(clippy::match_same_arms)]
-    pub const fn status_code(&self) -> axum::http::StatusCode {
+    pub const fn status_code(&self) -> StatusCode {
         match self {
-            Self::Database(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
             // ApiError::Test => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            Self::InvalidLogin => axum::http::StatusCode::UNAUTHORIZED,
-            Self::PasswordHashing(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            Self::UserAlreadyExists => axum::http::StatusCode::BAD_REQUEST,
-            Self::UnknownAlt(_) | Self::Unknown(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            Self::EmailError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            Self::RedisError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            Self::SystemTimeError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            Self::InvalidOTPCode(_) => axum::http::StatusCode::BAD_REQUEST,
-            Self::InvalidTOTPCode(_) => axum::http::StatusCode::BAD_REQUEST,
-            Self::TOTPIsRequired => axum::http::StatusCode::UNAUTHORIZED,
-            Self::Teapot => axum::http::StatusCode::IM_A_TEAPOT,
-            Self::TOTPIsAlreadyEnabled => axum::http::StatusCode::BAD_REQUEST,
-            Self::YouAreNotLoggedIn => axum::http::StatusCode::UNAUTHORIZED,
-            Self::InvalidRecoveryCode(_) => axum::http::StatusCode::BAD_REQUEST,
-            Self::UsedRecoveryCode(_) => axum::http::StatusCode::BAD_REQUEST,
-            Self::TOTPIsNotEnabled => axum::http::StatusCode::BAD_REQUEST,
-            Self::OTPRecoveryFlowNotFound => axum::http::StatusCode::NOT_FOUND,
-            Self::TOTPFlowNotFound => axum::http::StatusCode::NOT_FOUND,
-            Self::EmailIsNotVerified => axum::http::StatusCode::UNAUTHORIZED,
-            Self::EmailIsAlreadyVerified => axum::http::StatusCode::CONFLICT,
-            Self::InvalidEmailVerification => axum::http::StatusCode::BAD_REQUEST,
-            Self::InvalidAuthentication => axum::http::StatusCode::UNAUTHORIZED,
-            Self::FailedParsingScopes(_) => axum::http::StatusCode::BAD_REQUEST,
-            Self::OAuthAppNotFound(_) => axum::http::StatusCode::NOT_FOUND,
-            Self::OAuthAppNotOwned(_) => axum::http::StatusCode::FORBIDDEN,
-            Self::OAuthAppEmptyScopes => axum::http::StatusCode::BAD_REQUEST,
-            Self::OAuthAuthorizationNotFound(_) => axum::http::StatusCode::NOT_FOUND,
-            Self::SudoIsNotEnabled => axum::http::StatusCode::UNAUTHORIZED,
-            Self::SudoIsAlreadyEnabled => axum::http::StatusCode::BAD_REQUEST,
-            Self::SudoCannotBeEnabled => axum::http::StatusCode::FORBIDDEN,
-            Self::TOTPExchangeNotFound(_) => axum::http::StatusCode::NOT_FOUND,
-            Self::OTPExchangeNotFound(_) => axum::http::StatusCode::NOT_FOUND,
-            Self::SessionDoesNotExist(_) => axum::http::StatusCode::NOT_FOUND,
-            Self::FailedParsingURL(_) => axum::http::StatusCode::BAD_REQUEST,
-            Self::OAuthInvalidUri => axum::http::StatusCode::BAD_REQUEST,
-            Self::PasswordDoesNotMatch => axum::http::StatusCode::BAD_REQUEST,
-            Self::PasswordLowStrength => axum::http::StatusCode::BAD_REQUEST,
-            Self::RecoveryLinkNotFound => axum::http::StatusCode::NOT_FOUND,
+            Self::InvalidLogin => StatusCode::UNAUTHORIZED,
+            Self::PasswordHashing(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::UserAlreadyExists => StatusCode::BAD_REQUEST,
+            Self::UnknownAlt(_) | Self::Unknown(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::EmailError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::RedisError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::SystemTimeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::InvalidOTPCode(_) => StatusCode::BAD_REQUEST,
+            Self::InvalidTOTPCode(_) => StatusCode::BAD_REQUEST,
+            Self::TOTPIsRequired => StatusCode::UNAUTHORIZED,
+            Self::Teapot => StatusCode::IM_A_TEAPOT,
+            Self::TOTPIsAlreadyEnabled => StatusCode::BAD_REQUEST,
+            Self::YouAreNotLoggedIn => StatusCode::UNAUTHORIZED,
+            Self::InvalidRecoveryCode(_) => StatusCode::BAD_REQUEST,
+            Self::UsedRecoveryCode(_) => StatusCode::BAD_REQUEST,
+            Self::TOTPIsNotEnabled => StatusCode::BAD_REQUEST,
+            Self::OTPRecoveryFlowNotFound => StatusCode::NOT_FOUND,
+            Self::TOTPFlowNotFound => StatusCode::NOT_FOUND,
+            Self::EmailIsNotVerified => StatusCode::UNAUTHORIZED,
+            Self::EmailIsAlreadyVerified => StatusCode::CONFLICT,
+            Self::InvalidEmailVerification => StatusCode::BAD_REQUEST,
+            Self::InvalidAuthentication => StatusCode::UNAUTHORIZED,
+            Self::FailedParsingScopes(_) => StatusCode::BAD_REQUEST,
+            Self::OAuthAppNotFound(_) => StatusCode::NOT_FOUND,
+            Self::OAuthAppNotOwned(_) => StatusCode::FORBIDDEN,
+            Self::OAuthAppEmptyScopes => StatusCode::BAD_REQUEST,
+            Self::OAuthAuthorizationNotFound(_) => StatusCode::NOT_FOUND,
+            Self::SudoIsNotEnabled => StatusCode::UNAUTHORIZED,
+            Self::SudoIsAlreadyEnabled => StatusCode::BAD_REQUEST,
+            Self::SudoCannotBeEnabled => StatusCode::FORBIDDEN,
+            Self::TOTPExchangeNotFound(_) => StatusCode::NOT_FOUND,
+            Self::OTPExchangeNotFound(_) => StatusCode::NOT_FOUND,
+            Self::SessionDoesNotExist(_) => StatusCode::NOT_FOUND,
+            Self::FailedParsingURL(_) => StatusCode::BAD_REQUEST,
+            Self::OAuthInvalidUri => StatusCode::BAD_REQUEST,
+            Self::PasswordDoesNotMatch => StatusCode::BAD_REQUEST,
+            Self::PasswordLowStrength => StatusCode::BAD_REQUEST,
+            Self::RecoveryLinkNotFound => StatusCode::NOT_FOUND,
+            Self::ValidationError(_) => StatusCode::BAD_REQUEST,
+            Self::JsonSyntaxError(_) => StatusCode::BAD_REQUEST,
+            Self::JsonDataError(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::MissingJsonContentType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            Self::FailedToBufferContent => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::FailedToDeserializePathParams(_) => StatusCode::BAD_REQUEST,
+            Self::MissingPathParams => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::FailedToDeserializeQuery(_) => StatusCode::BAD_REQUEST,
         }
     }
 }
 
 impl IntoResponse for ApiError {
-    fn into_response(self) -> axum::response::Response {
+    fn into_response(self) -> Response {
         let status = self.status_code();
         tracing::error!("HTTP Error was thrown: {:?}", self);
         let error = HttpError {

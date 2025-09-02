@@ -22,6 +22,7 @@ use crate::{
 
 pub mod error;
 mod v1;
+mod validation;
 
 pub type HttpResult<T> = Result<T, error::ApiError>;
 

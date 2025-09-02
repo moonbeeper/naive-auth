@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::State, http::HeaderMap};
-use axum_valid::Valid;
+use axum::{Extension, extract::State, http::HeaderMap};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -26,8 +25,9 @@ use crate::{
     global::GlobalState,
     http::{
         HttpResult, OTP_TAG,
-        error::ApiError,
+        error::{ApiError, ApiHttpError},
         v1::{JsonEither, models},
+        validation::{Json, Valid},
     },
 };
 
@@ -58,8 +58,8 @@ pub struct AuthResponse {
     request_body = Login,
     responses(
         (status = 200, description = "Login flow started", body = AuthResponse),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
     ),
     tag = OTP_TAG,
     operation_id = "authOtpLogin"
@@ -157,8 +157,8 @@ pub struct AuthExchange {
     request_body = AuthExchange,
     responses(
         (status = 200, description = "Exchanged for session or TOTP challenge", body = JsonEither<models::Session, TotpResponse>),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
     ),
     tag = OTP_TAG,
     operation_id = "authOtpExchangeLogin"
@@ -298,10 +298,10 @@ async fn exchange_login(
     request_body = AuthExchange,
     responses(
         (status = 200, description = "Successful OTP exchange"),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 404, description = "OTP exchange flow not found"),
-        (status = 422, description = "Missing required fields"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 404, description = "OTP exchange flow not found", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
     ),
     tag = OTP_TAG,
     operation_id = "authOtpExchange"

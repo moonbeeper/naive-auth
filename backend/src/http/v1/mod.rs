@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::State, response::IntoResponse};
+use axum::{Extension, extract::State, response::IntoResponse};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -19,7 +19,11 @@ use crate::{
     },
     database::models::user::User,
     global::GlobalState,
-    http::{HttpResult, error::ApiError},
+    http::{
+        HttpResult,
+        error::{ApiError, ApiHttpError},
+        validation::Json,
+    },
 };
 
 pub mod auth;
@@ -48,7 +52,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     path = "/user",
     responses(
         (status = 200, description = "User info", body = models::User),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
 )]
 async fn get_user(
@@ -85,7 +89,7 @@ async fn get_user(
     get,
     path = "/fun",
     responses(
-        (status = 418, description = "I'm a teapot :D")
+        (status = 418, description = "I'm a teapot :D", body = ApiHttpError)
     ),
 )]
 async fn funny() -> HttpResult<()> {

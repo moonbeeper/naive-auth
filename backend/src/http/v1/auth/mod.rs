@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::State};
-use axum_valid::Valid;
+use axum::{Extension, extract::State};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -15,7 +14,11 @@ use crate::{
     },
     email::resources::AuthEmails,
     global::GlobalState,
-    http::{AUTH_TAG, HttpResult, PASSWORD_TAG, error::ApiError},
+    http::{
+        AUTH_TAG, HttpResult, PASSWORD_TAG,
+        error::{ApiError, ApiHttpError},
+        validation::{Json, Valid},
+    },
 };
 
 pub mod oauth;
@@ -50,9 +53,9 @@ pub struct VerifyEmail {
     request_body = VerifyEmail,
     responses(
         (status = 200, description = "Email verified successfully"),
-        (status = 401, description = "Not authenticated"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 409, description = "Email has been already verified"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 409, description = "Email has been already verified", body = ApiHttpError),
     ),
     tag = PASSWORD_TAG
 )]
@@ -117,7 +120,7 @@ pub struct CurrentActiveOptions {
     path = "/signout",
     responses(
         (status = 200, description = "Signed out"),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = AUTH_TAG
 )]

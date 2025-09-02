@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
-use axum::{
-    Extension, Json,
-    extract::{Path, State},
-};
-use axum_valid::Valid;
+use axum::{Extension, extract::State};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -14,7 +10,12 @@ use crate::{
     auth::{middleware::AuthContext, ops::remove_session},
     database::models::session::{Session, SessionId},
     global::GlobalState,
-    http::{HttpResult, SESSION_TAG, error::ApiError, v1::models},
+    http::{
+        HttpResult, SESSION_TAG,
+        error::{ApiError, ApiHttpError},
+        v1::models,
+        validation::{Json, Path, Valid},
+    },
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -32,7 +33,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     path = "/",
     responses(
         (status = 200, description = "Your current session", body = models::Session),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = SESSION_TAG
 )]
@@ -59,7 +60,7 @@ async fn current_session(
     path = "/list",
     responses(
         (status = 200, description = "A list of the your open sessions", body = Vec<models::Session>),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = SESSION_TAG
 )]
@@ -100,9 +101,9 @@ pub struct SessionIdParam {
     ),
     responses(
         (status = 200, description = "Successfully deleted the session"),
-        (status = 401, description = "Not authenticated or Sudo is not enabled"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 404, description = "Session not found"),
+        (status = 401, description = "Not authenticated or Sudo is not enabled", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 404, description = "Session not found", body = ApiHttpError),
     ),
     tag = SESSION_TAG
 )]
@@ -147,9 +148,9 @@ async fn delete_session(
     ),
     responses(
         (status = 200, description = "The session info", body = Vec<models::TinySession>),
-        (status = 401, description = "Not authenticated or Sudo is not enabled"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 404, description = "Session not found"),
+        (status = 401, description = "Not authenticated or Sudo is not enabled", body = ApiHttpError),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 404, description = "Session not found", body = ApiHttpError),
     ),
     tag = SESSION_TAG
 )]
@@ -187,7 +188,7 @@ async fn get_session(
     path = "/all",
     responses(
         (status = 200, description = "Deleted all open sessions"),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = SESSION_TAG
 )]

@@ -3,12 +3,7 @@ use std::sync::Arc;
 use argon2::{
     Argon2, PasswordHash, PasswordHasher as _, PasswordVerifier as _, password_hash::SaltString,
 };
-use axum::{
-    Extension, Json,
-    extract::{Path, State},
-    http::HeaderMap,
-};
-use axum_valid::Valid;
+use axum::{Extension, extract::State, http::HeaderMap};
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
@@ -35,8 +30,9 @@ use crate::{
     global::GlobalState,
     http::{
         HttpResult, PASSWORD_TAG,
-        error::ApiError,
+        error::{ApiError, ApiHttpError},
         v1::{JsonEither, models, string_trim},
+        validation::{Json, Path, Valid},
     },
 };
 
@@ -54,7 +50,6 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
 pub struct LoginPassword {
     #[serde(rename = "login")]
     login_or_email: String,
-    #[validate(length(min = 8))]
     password: String,
 }
 
@@ -67,7 +62,7 @@ pub struct LoginPassword {
     request_body = LoginPassword,
     responses(
         (status = 200, description = "Successful login, session or TOTP challenge", body = JsonEither<models::Session, TotpResponse<'static>>),
-        (status = 400, description = "Bad request (invalid login, email not verified, etc)"),
+        (status = 400, description = "Bad request (invalid login, email not verified, etc)", body = ApiHttpError),
     ),
     tag = PASSWORD_TAG,
     operation_id = "authPasswordLogin"
@@ -164,7 +159,7 @@ pub struct RegisterPassword {
     request_body = RegisterPassword,
     responses(
         (status = 200, description = "Account registered, verify your email lol"),
-        (status = 400, description = "Invalid input or already exists"),
+        (status = 400, description = "Invalid input or already exists", body = ApiHttpError),
     ),
     tag = PASSWORD_TAG
 )]
@@ -308,8 +303,8 @@ pub struct ResetPasswordStatus {
     ),
     responses(
         (status = 200, description = "The current status of the reset password flow", body = ResetPasswordStatus),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 404, description = "The reset password flow was not found"),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 404, description = "The reset password flow was not found", body = ApiHttpError),
     ),
     tag = PASSWORD_TAG
 )]
@@ -362,9 +357,9 @@ pub struct ResetPasswordCheck {
     ),
     responses(
         (status = 200, description = "Successfully verified the recovery flow"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
-        (status = 404, description = "The reset password flow was not found"),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
+        (status = 404, description = "The reset password flow was not found", body = ApiHttpError),
     ),
     tag = PASSWORD_TAG
 )]
@@ -476,9 +471,9 @@ pub struct ResetPasswordExchange {
     ),
     responses(
         (status = 200, description = "Successfully set the new password"),
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
-        (status = 404, description = "The reset password flow was not found"),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
+        (status = 404, description = "The reset password flow was not found", body = ApiHttpError),
     ),
     tag = PASSWORD_TAG
 )]

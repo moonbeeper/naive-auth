@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Extension, Json, extract::State};
+use axum::{Extension, extract::State};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -18,7 +18,12 @@ use crate::{
         },
     },
     global::GlobalState,
-    http::{HttpResult, SUDO_TAG, error::ApiError, v1::auth::CurrentActiveOptions},
+    http::{
+        HttpResult, SUDO_TAG,
+        error::{ApiError, ApiHttpError},
+        v1::auth::CurrentActiveOptions,
+        validation::Json,
+    },
 };
 
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
@@ -54,14 +59,15 @@ pub struct SudoEnableResponse {
     path = "/",
     responses(
         (status = 200, description = "Sudo has been enabled", body = SudoEnableResponse),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
         // I don't know if I want to mention a sudo err here
-        (status = 400, description = "Validation or parsing error"),
-        (status = 422, description = "Missing required fields"),
-        (status = 403, description = "Sudo cannot be enabled with the chosen option"),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
+        (status = 403, description = "Sudo cannot be enabled with the chosen option", body = ApiHttpError),
     ),
     tag = SUDO_TAG
 )]
+#[axum::debug_handler]
 async fn enable_sudo(
     State(global): State<Arc<GlobalState>>,
     cookies: Cookies,
@@ -145,7 +151,7 @@ async fn enable_sudo(
     path = "/",
     responses(
         (status = 200, description = "The available Sudo enable options", body = CurrentActiveOptions),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = SUDO_TAG
 )]
@@ -183,7 +189,7 @@ struct SudoStatus {
     path = "/status",
     responses(
         (status = 200, description = "The current Sudo status", body = SudoStatus),
-        (status = 401, description = "Not authenticated"),
+        (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = SUDO_TAG
 )]
