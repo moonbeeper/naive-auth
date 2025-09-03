@@ -58,7 +58,8 @@ pub const SUDO_TAG: &str = "Sudo";
         schemas(
             v1::auth::oauth::OauthResponseType,
             v1::auth::oauth::CodeChallengeMethod,
-            error::ApiErrorFlattened, // the error enum has be added manually to the schema
+            // the error stuff has be added manually to the schema
+            error::ApiErrorFlattened,
         )
     )
 )]

@@ -6,8 +6,11 @@ use axum::{
 
 use crate::database::redis::models::RedisError;
 
-// TODO: maybe making this in a proc macro so it would use ApiErrorFlattened?
-// that way we could still use this struct for the actual responses, meanwhile the generated one only for the schema
+// I've tried implementing the proc macro to create a clone of the error struct with the error field replaced by
+// for example the flattened api error enum, it was going to be used for the openapi schema but seems like
+// using it is a big bit worse than I thought, and by looking at other apis, they practically have their error schema
+// the same as mine. the proc macro was trashed.
+
 /// An alias to the actual `HttpError`
 pub type ApiHttpError = HttpError<'static>;
 
