@@ -46,13 +46,17 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 struct CreateApp {
+    /// The name of the OAuth app
     #[schema(example = "My App")]
     #[validate(length(min = 6, max = 32))]
     name: String,
+    /// The description of the OAuth app
     #[schema(example = "A description for the oauth app")]
     #[validate(length(max = 256))] // dunno
     description: String,
+    /// The scopes the OAuth app can request
     scopes: Vec<String>,
+    /// The callback URL for the OAuth app
     #[schema(example = "https://oauthdebugger.com/debug")]
     #[validate(url)]
     callback_url: String,
@@ -132,7 +136,6 @@ async fn create_app(
     }))
 }
 
-// i love axum_valid. i dont need to manually do validations haha
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 struct AppParam {
     #[validate(length(equal = 32))]
@@ -188,13 +191,17 @@ async fn delete_app(
 struct UpdateApp {
     // #[validate(length(equal = 32))]
     // id: OauthAppId,
+    /// The new name of the OAuth app
     #[schema(example = "My new OAuth app name")]
     #[validate(length(min = 6, max = 32))]
     name: Option<String>,
+    /// The new description of the OAuth app
     #[schema(example = "My new OAuth app description")]
     #[validate(length(max = 256))] // dunno
     description: Option<String>,
+    /// The new scopes the OAuth app can request
     scopes: Option<Vec<String>>,
+    /// The new callback URL for the OAuth app
     #[schema(example = "https://oauthdebugger.com/debug")]
     #[validate(url)]
     callback_url: Option<String>,
@@ -204,6 +211,7 @@ struct UpdateApp {
 #[utoipa::path(
     put,
     path = "/apps/{id}",
+    request_body = UpdateApp, // seems like utoipa already knows that it should use this struct. but just in case lol
     params(
         ("id" = OauthAppId, description = "The ID of the OAuth app to update")
     ),

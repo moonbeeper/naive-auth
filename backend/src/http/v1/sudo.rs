@@ -21,7 +21,6 @@ use crate::{
     http::{
         HttpResult, SUDO_TAG,
         error::{ApiError, ApiHttpError},
-        v1::auth::CurrentActiveOptions,
         validation::Json,
     },
 };
@@ -42,6 +41,7 @@ pub enum SudoEnableOption {
 
 #[derive(Debug, serde::Deserialize, ToSchema)]
 pub struct SudoEnableRequest {
+    /// The option to use for enabling sudo
     #[schema(example = "otp")]
     option: SudoEnableOption,
 }
@@ -143,6 +143,13 @@ async fn enable_sudo(
             }))
         }
     }
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+
+pub struct CurrentActiveOptions {
+    pub otp: bool,
+    pub totp: bool,
 }
 
 /// Get the options for enabling sudo

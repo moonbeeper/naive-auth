@@ -141,10 +141,12 @@ async fn register(global: Arc<GlobalState>, email: String) -> HttpResult<Json<Au
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct AuthExchange {
+    /// The link ID of the OTP flow
     #[validate(length(equal = 26))]
     link_id: FlowId,
     #[validate(email)]
     email: String,
+    /// The code that was sent to the email address
     #[validate(length(equal = 6))]
     code: String,
 }

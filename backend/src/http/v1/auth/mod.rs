@@ -40,6 +40,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
 pub struct VerifyEmail {
     #[validate(email)]
     email: String,
+    /// The code that was sent to the email address
     #[validate(length(equal = 6))]
     code: String,
 }
@@ -105,13 +106,6 @@ async fn verify_email(
         return Ok(());
     }
     Err(ApiError::InvalidEmailVerification)
-}
-
-#[derive(Debug, serde::Serialize, ToSchema)]
-
-pub struct CurrentActiveOptions {
-    pub otp: bool,
-    pub totp: bool,
 }
 
 /// Sign out of this current session

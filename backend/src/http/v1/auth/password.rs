@@ -48,6 +48,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct LoginPassword {
+    /// May be either the user's login or email
     #[serde(rename = "login")]
     login_or_email: String,
     password: String,
@@ -340,6 +341,7 @@ async fn reset_password_status(
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct ResetPasswordCheck {
+    /// The TOTP code or recovery code
     #[serde(deserialize_with = "string_trim")]
     #[validate(length(min = 6, max = 11))]
     code_or_recovery: String,
@@ -453,8 +455,10 @@ async fn reset_password_check(
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct ResetPasswordExchange {
+    /// The new password
     #[validate(length(min = 8))]
     password: String,
+    /// The new password again
     #[validate(length(min = 8))]
     password_confirm: String,
 }

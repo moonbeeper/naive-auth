@@ -6,6 +6,8 @@ use axum::{
 
 use crate::database::redis::models::RedisError;
 
+// TODO: maybe making this in a proc macro so it would use ApiErrorFlattened?
+// that way we could still use this struct for the actual responses, meanwhile the generated one only for the schema
 /// An alias to the actual `HttpError`
 pub type ApiHttpError = HttpError<'static>;
 
@@ -15,7 +17,8 @@ pub struct HttpError<'a> {
     pub message: String,
 }
 
-#[derive(Debug, thiserror::Error, strum::IntoStaticStr)]
+#[derive(Debug, thiserror::Error, strum::IntoStaticStr, beepauth_macros::FlattenEnum)]
+#[flatten_enum(utoipa_name = "ApiHttpError")]
 pub enum ApiError {
     #[error("Unexpected Database Error: {0}")]
     Database(#[from] sqlx::Error),

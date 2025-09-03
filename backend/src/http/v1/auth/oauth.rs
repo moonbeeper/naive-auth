@@ -69,15 +69,22 @@ pub enum CodeChallengeMethod {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Validate, ToSchema, utoipa::IntoParams)]
 pub struct PreAuthorize {
+    /// The OAuth response type, must be code!
     response_type: OauthResponseType,
+    /// The OAuth client ID
     #[validate(length(equal = 32))]
     client_id: OauthAppId,
+    /// The redirect after authorization
     #[validate(url)]
     redirect_uri: Option<String>,
+    /// The requested scopes, space separated. If not provided, the OAuth app default scopes will be used
     scope: Option<String>,
+    /// The state to be returned back after authorization
     state: Option<String>,
+    /// PKCE code challenge, 43 characters, base64url encoded
     #[validate(length(equal = 43))]
     code_challenge: String,
+    /// PKCE challenge method, must be S256!
     code_challenge_method: CodeChallengeMethod,
 }
 
@@ -93,7 +100,15 @@ pub struct PreAuthorizeResponse {
 #[utoipa::path(
     get,
     path = "/authorize",
-    params(PreAuthorize),
+    params(PreAuthorize
+        // ("response_type" = OauthResponseType    , description = "The OAuth response type, must be code!"),
+        // ("client_id" = OauthAppId, description = "The OAuth client ID"),
+        // ("redirect_uri" = Option<String>, description = "The redirect after authorization"),
+        // ("scope" = Option<String>, description = "The redirect after authorization"),
+        // ("state" = Option<String>, description = "The state to be returned back after authorization"),
+        // ("code_challenge" = String, description = "PKCE code challenge, 43 characters, base64url encoded"),
+        // ("code_challenge_method" = CodeChallengeMethod, description = "PKCE challenge method, must be S256!"),
+    ),
     responses(
         (status = 200, description = "Pre-authorization response", body = PreAuthorizeResponse),
         (status = 401, description = "Not authenticated", body = ApiHttpError),
@@ -188,8 +203,10 @@ async fn pre_authorize(
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct Authorize {
+    /// The link ID of the OAuth authorization flow
     #[validate(length(equal = 26))]
     link_id: FlowId,
+    /// Whether to authorize or deny the request
     authorize: bool,
 }
 
@@ -198,6 +215,7 @@ pub struct Authorize {
 pub enum TokenType {
     #[default]
     Bearer,
+    #[serde(rename = "mac")]
     _Mac, // never will use this
 }
 
@@ -292,15 +310,22 @@ pub enum GrantType {
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct ExchangeRequest {
+    // I some times hate clippy's demands, but seems like swagger likes double ``
+    /// The OAuth grant type, must be `authorization_code`
     grant_type: GrantType,
+    /// The OAuth code received
     #[validate(length(equal = 32))]
     code: StringId,
+    /// The redirect url requested when authorizing, must match exactly to the one used when authorizing
     #[validate(url)]
     redirect_uri: Option<String>,
+    /// The OAuth app client ID
     #[validate(length(equal = 32))]
     client_id: OauthAppId,
+    /// The OAuth app client secret
     #[validate(length(equal = 52))]
     client_secret: String,
+    /// The origin random string that was used to create the code challenge
     #[validate(length(min = 43, max = 128))]
     code_verifier: String,
 }

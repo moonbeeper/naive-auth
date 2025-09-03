@@ -182,6 +182,8 @@ async fn get_session(
     Ok(Json(models::Session::from(session)))
 }
 
+// TODO: maybe add sudo check here?
+// I was thinking to make it require Sudo. I'll think about it.
 /// Delete all your open sessions
 #[utoipa::path(
     delete,

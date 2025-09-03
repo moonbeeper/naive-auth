@@ -50,7 +50,16 @@ pub const SUDO_TAG: &str = "Sudo";
         (name = OTP_TAG, description = "One-Time Passcode Authentication endpoints"),
         (name = SESSION_TAG, description = "Session related endpoints"),
         (name = SUDO_TAG, description = "Endpoints related to Sudo mode"),
-        (name = "default", description = "Uncategorized"),
+        (name = "default", description = "Endpoints that don't really have a specific tag"),
+    ),
+    // HACK: this makes so these enums are included in the openapi file.
+    // for some reason utoipa isn't picking them up
+    components(
+        schemas(
+            v1::auth::oauth::OauthResponseType,
+            v1::auth::oauth::CodeChallengeMethod,
+            error::ApiErrorFlattened, // the error enum has be added manually to the schema
+        )
     )
 )]
 pub struct ApiDoc;

@@ -41,8 +41,10 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct Exchange {
+    /// The link ID of the TOTP flow
     #[validate(length(equal = 26))]
     link_id: FlowId,
+    /// The TOTP code or recovery code
     #[serde(deserialize_with = "string_trim")]
     #[validate(length(equal = 6))]
     code_or_recovery: String,
@@ -340,6 +342,7 @@ async fn enable(
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct EnableExchange {
+    /// The TOTP code
     #[validate(length(equal = 6))]
     code: String,
 }
