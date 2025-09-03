@@ -1,9 +1,16 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-use axum::routing::get;
+use axum::{
+    http::{
+        HeaderValue,
+        header::{AUTHORIZATION, CONTENT_TYPE},
+    },
+    routing::get,
+};
 use tokio::{net::TcpSocket, sync::oneshot};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
+use tower_http::cors::CorsLayer;
 use utoipa::{
     OpenApi,
     openapi::{
@@ -76,11 +83,27 @@ fn routes(global: &Arc<GlobalState>) -> OpenApiRouter {
         SecurityScheme::ApiKey(ApiKey::Cookie(session)),
     );
 
+    // browser oauth clients won't be supported.
+    let cors = CorsLayer::new()
+        .allow_origin(
+            global
+                .settings
+                .http
+                .frontend_url
+                .parse::<HeaderValue>()
+                .unwrap(),
+        )
+        .allow_credentials(true)
+        .allow_headers([CONTENT_TYPE, AUTHORIZATION])
+        .allow_credentials(true)
+        .max_age(Duration::from_secs(7200)); // max age that allows chrome
+
     OpenApiRouter::with_openapi(openapi)
         .nest("/v1", v1::routes())
         .route("/", get(|| async { "Hello, World!" }))
         .layer(
             ServiceBuilder::new()
+                .layer(cors)
                 .layer(CookieManagerLayer::new())
                 .layer(AuthManagerLayer::new(global.clone()))
                 .layer(OauthManagerLayer::new(global.clone())),

@@ -12,7 +12,7 @@ pub struct HttpSettings {
     pub origin: String,
     #[default(true)]
     pub api_explorer: bool,
-    #[default("https://127.0.0.1:8081")]
+    #[default("http://127.0.0.1:5173")]
     pub frontend_url: String,
 }
 
