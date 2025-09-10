@@ -1,19 +1,31 @@
-<script>
-	import { get } from 'svelte/store';
+<script lang="ts">
 	import Button from './button.svelte';
 	import { currentText } from '$lib/bigHeader';
+	import { user } from '$lib/auth';
+	import client from '$lib/api/baseFetch';
+	import { goto } from '$app/navigation';
 
-	let headerText = $state('Unknown');
-	currentText.subscribe((text) => {
-		headerText = text;
-	});
+	// let headerText = $state('???');
+	// currentText.subscribe((text) => {
+	// 	headerText = text;
+	// });
 	// let headerText = get(currentText);
+	let headerText = $derived($currentText); // i get it (not really)
+	let isLogged = $derived(!!$user);
+
+	async function signout() {
+		await client.POST('/v1/auth/signout');
+		user.set(null); // clear it even if it fails lol
+		await goto('/');
+	}
 </script>
 
 <header>
 	<h1>{headerText}</h1>
 	<nav>
-		<Button>button</Button>
+		{#if isLogged}
+			<Button onclick={() => signout()}>Log out</Button>
+		{/if}
 	</nav>
 </header>
 
@@ -30,6 +42,7 @@
 	// 18 20 24       32 40 48
 	// magic number land
 	h1 {
+		flex: 1 0 auto; // woops, seems this makes it have the correct bounding box in the devtools
 		font-weight: 700;
 		font-size: clamp(1.125rem, 0.9rem + 1.2vw, 2rem);
 		letter-spacing: var(--title-spacing);
@@ -39,7 +52,7 @@
 
 	@media (min-width: 544px) {
 		header {
-			--title-spacing: -0.025em;
+			--title-spacing: var(--text-almost-tight-spacing);
 		}
 		h1 {
 			font-size: clamp(1.25rem, 1rem + 1.4vw, 2.5rem);
@@ -48,24 +61,12 @@
 
 	@media (min-width: 768px) {
 		header {
-			--title-spacing: -0.05em;
+			--title-spacing: var(--text-tight-spacing);
 		}
 		h1 {
 			font-size: clamp(1.5rem, 1.1rem + 1.8vw, 3rem);
 		}
 	}
-
-	// @media (min-width: 544px) {
-	// 	h1 {
-	// 		font-size: 40px;
-	// 	}
-	// }
-
-	// @media (min-width: 768px) {
-	// 	h1 {
-	// 		font-size: 48px;
-	// 	}
-	// }
 
 	nav {
 		width: 100%;

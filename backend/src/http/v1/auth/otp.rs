@@ -10,8 +10,8 @@ use crate::{
     auth::{
         middleware::AuthContext,
         ops::{
-            DeviceMetadata, TotpResponse, create_session, create_totp_login_exchange,
-            get_totp_client, remove_session, totp_secret,
+            DeviceMetadata, create_session, create_totp_login_exchange, get_totp_client,
+            remove_session, totp_secret,
         },
     },
     database::{
@@ -26,7 +26,7 @@ use crate::{
     http::{
         HttpResult, OTP_TAG,
         error::{ApiError, ApiHttpError},
-        v1::{JsonEither, models},
+        v1::models,
         validation::{Json, Valid},
     },
 };
@@ -151,6 +151,8 @@ pub struct AuthExchange {
     code: String,
 }
 
+// TODO: Store the OTP code instead of the secret
+// We are NOT storing the code. Making so the totp code is being rotated every 30 seconds which is not cool.
 /// Exchange the code sent to the user's email for a session
 #[allow(clippy::too_many_lines)] // leave me alone please
 #[utoipa::path(
@@ -158,20 +160,22 @@ pub struct AuthExchange {
     path = "/exchange-login",
     request_body = AuthExchange,
     responses(
-        (status = 200, description = "Exchanged for session or TOTP challenge", body = JsonEither<models::Session, TotpResponse>),
+        (status = 200, description = "Exchanged for a new session", body = models::Session),
         (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 403, description = "TOTP challenge required", body = ApiHttpError),
         (status = 422, description = "Missing required fields", body = ApiHttpError),
     ),
     tag = OTP_TAG,
     operation_id = "authOtpExchangeLogin"
 )]
+// #[axum::debug_handler]
 async fn exchange_login(
     State(global): State<Arc<GlobalState>>,
     Extension(session): Extension<AuthContext>,
     cookies: Cookies,
     headers: HeaderMap,
     Valid(Json(request)): Valid<Json<AuthExchange>>,
-) -> HttpResult<JsonEither<models::Session, TotpResponse<'static>>> {
+) -> HttpResult<Json<models::Session>> {
     remove_session(session, &cookies, &global).await?; // force logout
 
     if request.code.trim().is_empty() {
@@ -209,6 +213,7 @@ async fn exchange_login(
         )
         .await?;
 
+        // when the user uses OTP to login, we can assume that their email is verified because they just used our code
         if !user.email_verified {
             user.email_verified = true;
             let mut tx = global.database.begin().await?;
@@ -217,8 +222,7 @@ async fn exchange_login(
         }
 
         if user.totp_secret.is_some() {
-            let response = create_totp_login_exchange(&user, &global.redis).await?;
-            return Ok(JsonEither::Right(response));
+            create_totp_login_exchange(&user, &global.redis).await?;
         }
 
         let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
@@ -239,7 +243,7 @@ async fn exchange_login(
             )
             .await?;
 
-        return Ok(JsonEither::Left(models::Session::from(sess.session)));
+        return Ok(Json(models::Session::from(sess.session)));
     } else if let Some(AuthFlow::OtpRegisterRequest { secret }) = flow {
         if (User::get_by_email(&request.email, &global.database).await?).is_some() {
             return Err(ApiError::InvalidLogin);
@@ -286,7 +290,7 @@ async fn exchange_login(
             )
             .await?;
 
-        return Ok(JsonEither::Left(models::Session::from(sess.session)));
+        return Ok(Json(models::Session::from(sess.session)));
     }
 
     Err(ApiError::InvalidLogin)

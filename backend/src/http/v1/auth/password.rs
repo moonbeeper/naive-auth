@@ -62,8 +62,9 @@ pub struct LoginPassword {
     path = "/login",
     request_body = LoginPassword,
     responses(
-        (status = 200, description = "Successful login, session or TOTP challenge", body = JsonEither<models::Session, TotpResponse<'static>>),
+        (status = 200, description = "Successful login, exchanged for a new session", body = models::Session),
         (status = 400, description = "Bad request (invalid login, email not verified, etc)", body = ApiHttpError),
+        (status = 403, description = "TOTP challenge required", body = ApiHttpError),
     ),
     tag = PASSWORD_TAG,
     operation_id = "authPasswordLogin"
@@ -74,7 +75,7 @@ async fn login(
     cookies: Cookies,
     headers: HeaderMap,
     Valid(Json(request)): Valid<Json<LoginPassword>>,
-) -> HttpResult<JsonEither<models::Session, TotpResponse<'static>>> {
+) -> HttpResult<Json<models::Session>> {
     remove_session(session, &cookies, &global).await?; // force logout
     let login = any_ascii::any_ascii(&request.login_or_email);
 
@@ -122,8 +123,7 @@ async fn login(
         .map_err(|_| ApiError::InvalidLogin)?;
 
     if user.totp_secret.is_some() {
-        let response = create_totp_login_exchange(&user, &global.redis).await?;
-        return Ok(JsonEither::Right(response));
+        create_totp_login_exchange(&user, &global.redis).await?;
     }
 
     let sess = create_session("temporary".into(), &user, &metadata, &global.settings)?;
@@ -138,7 +138,7 @@ async fn login(
         .send(&user.email, AuthEmails::NewLogin { login, metadata })
         .await?;
 
-    Ok(JsonEither::Left(models::Session::from(sess.session)))
+    Ok(Json(models::Session::from(sess.session)))
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]

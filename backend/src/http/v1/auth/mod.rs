@@ -66,16 +66,13 @@ async fn verify_email(
     Extension(auth_context): Extension<AuthContext>,
     Valid(Json(request)): Valid<Json<VerifyEmail>>,
 ) -> HttpResult<()> {
-    if !auth_context.is_authenticated() {
-        return Err(ApiError::YouAreNotLoggedIn);
-    }
+    remove_session(auth_context, &cookies, &global).await?;
 
     if request.code.trim().is_empty() {
         return Err(ApiError::InvalidOTPCode(request.code));
     }
 
-    let Some(user) = User::get_by_email(&request.email, &global.database).await? else {
-        remove_session(auth_context, &cookies, &global).await?;
+    let Some(mut user) = User::get_by_email(&request.email, &global.database).await? else {
         return Err(ApiError::InvalidLogin);
     };
 
@@ -95,10 +92,9 @@ async fn verify_email(
             return Err(ApiError::InvalidEmailVerification);
         }
         let mut tx = global.database.begin().await?;
-        let mut mut_user = user.clone();
-        mut_user.email_verified = true;
+        user.email_verified = true;
 
-        mut_user.update(&mut tx).await?;
+        user.update(&mut tx).await?;
         tx.commit().await?;
 
         let mail = AuthEmails::EmailVerified { login: user.login };

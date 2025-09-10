@@ -134,7 +134,7 @@ pub struct TotpResponse<'a> {
 pub async fn create_totp_login_exchange(
     user: &User,
     redis: &fred::clients::Pool,
-) -> Result<TotpResponse<'static>, RedisError> {
+) -> Result<(), ApiError> {
     let flow_id = FlowId::new();
     AuthFlow::TotpExchange {
         user_id: user.id,
@@ -147,11 +147,13 @@ pub async fn create_totp_login_exchange(
     )
     .await?;
 
-    Ok(TotpResponse {
-        error: ApiError::TOTPIsRequired.into(),
-        message: ApiError::TOTPIsRequired.to_string(),
-        link_id: flow_id,
-    })
+    Err(ApiError::TOTPIsRequired(flow_id))
+
+    // Ok(TotpResponse {
+    //     error: ApiError::TOTPIsRequired.into(),
+    //     message: ApiError::TOTPIsRequired.to_string(),
+    //     link_id: flow_id,
+    // })
 }
 
 // this would give something like "1beef-birb1"

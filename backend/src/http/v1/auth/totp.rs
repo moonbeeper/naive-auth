@@ -46,7 +46,7 @@ pub struct Exchange {
     link_id: FlowId,
     /// The TOTP code or recovery code
     #[serde(deserialize_with = "string_trim")]
-    #[validate(length(equal = 6))]
+    #[validate(length(min = 6, max = 11))] // oops, did not account for recovery codes
     code_or_recovery: String,
 }
 
@@ -81,6 +81,8 @@ async fn exchange_login(
     )
     .await?;
 
+    // dbg!(&flow);
+
     let metadata = DeviceMetadata::from_headers(&headers);
 
     if let Some(AuthFlow::TotpExchange {
@@ -88,11 +90,15 @@ async fn exchange_login(
     }) = flow
     {
         let Some(mut user) = User::get(user_id, &global.database).await? else {
+            // println!("what");
             return Err(ApiError::InvalidLogin);
         };
+        dbg!(&user);
 
         if user.totp_secret.is_none() {
-            return Err(ApiError::InvalidLogin); // yup. extra check just so there's a bug in another place
+            // println!("what2");
+
+            return Err(ApiError::InvalidLogin);
         }
 
         if TOTP_CODE_REGEX.is_match(&request.code_or_recovery) {
@@ -347,7 +353,7 @@ pub struct EnableExchange {
     code: String,
 }
 
-/// Exchange the Link ID to finalize enabling TOTP
+/// Finalize enabling TOTP for the current user
 #[utoipa::path(
     post,
     path = "/enable/exchange",

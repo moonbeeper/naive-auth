@@ -4,7 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use crate::database::redis::models::RedisError;
+use crate::database::redis::models::{FlowId, RedisError};
 
 // I've tried implementing the proc macro to create a clone of the error struct with the error field replaced by
 // for example the flattened api error enum, it was going to be used for the openapi schema but seems like
@@ -18,6 +18,8 @@ pub type ApiHttpError = HttpError<'static>;
 pub struct HttpError<'a> {
     pub error: &'a str,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link_id: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error, strum::IntoStaticStr, beepauth_macros::FlattenEnum)]
@@ -48,7 +50,7 @@ pub enum ApiError {
     #[error("Seems like {0} is not really a valid TOTP code")] // its just a copy of the otp err
     InvalidTOTPCode(String),
     #[error("2FA is enabled for this account")]
-    TOTPIsRequired,
+    TOTPIsRequired(FlowId), // using flow id because it implements copy
     #[error("hi there, I am a teapot")]
     Teapot,
     #[error("2FA is already enabled on your account!")]
@@ -143,7 +145,7 @@ impl ApiError {
             Self::SystemTimeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::InvalidOTPCode(_) => StatusCode::BAD_REQUEST,
             Self::InvalidTOTPCode(_) => StatusCode::BAD_REQUEST,
-            Self::TOTPIsRequired => StatusCode::UNAUTHORIZED,
+            Self::TOTPIsRequired(_) => StatusCode::FORBIDDEN,
             Self::Teapot => StatusCode::IM_A_TEAPOT,
             Self::TOTPIsAlreadyEnabled => StatusCode::BAD_REQUEST,
             Self::YouAreNotLoggedIn => StatusCode::UNAUTHORIZED,
@@ -188,9 +190,17 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let status = self.status_code();
         tracing::error!("HTTP Error was thrown: {:?}", self);
+
+        let mut link_id = None;
+
+        if let Self::TOTPIsRequired(ref id) = self {
+            link_id = Some(id.to_string());
+        }
+
         let error = HttpError {
             message: self.to_string(),
             error: self.into(),
+            link_id,
         };
 
         (status, Json(error)).into_response()

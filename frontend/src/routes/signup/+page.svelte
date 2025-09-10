@@ -1,8 +1,8 @@
 <script>
 	import { currentText } from '$lib/bigHeader';
-	import { fade, fly, slide } from 'svelte/transition';
 	import Button from '../../components/button.svelte';
-	import Input from '../../components/input.svelte';
+	import Input from '../../components/forms/input.svelte';
+	import Spinner from '../../components/spinner.svelte';
 
 	currentText.set('Sign up');
 </script>
@@ -14,10 +14,10 @@
 			<label for="">Email address</label>
 			<input type="text" name="lmao" placeholder="beep@example.com" />
 		</div> -->
-		<Input label="Username" name="email" type="text" placeholder="beep@example.com" big />
-		<Input label="Email address" name="email" type="text" placeholder="beep@example.com" big />
+		<Input name="email" type="text" placeholder="beep@example.com" big />
+		<Input name="email" type="text" placeholder="beep@example.com" big />
 		<!-- thanks cal com -->
-		<Input label="Password" name="password" type="password" placeholder="•••••••••••••" big />
+		<Input name="password" type="password" placeholder="•••••••••••••" big />
 
 		<p>Already have an account? <a href="/">Log in</a></p>
 
@@ -53,10 +53,6 @@
 	}
 
 	.container {
-		// margin-top: 2rem;
-		// border: 2px solid rgba(234, 234, 234, 0.05);
-		// padding: 2rem;
-		// border-radius: 1rem;
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
@@ -66,37 +62,12 @@
 		transition: all 0.2s ease-out;
 	}
 
-	// a {
-	// 	grid-column: span 1;
-	// 	background-color: #0a0a0a;
-	// 	border-radius: 0.5rem 0.5rem 0 0;
-	// 	justify-content: center;
-	// 	flex-direction: column;
-	// 	display: flex;
-	// 	font-size: 1.125rem; // seems clearer at 18px than 16px
-	// 	font-weight: 600;
-	// 	color: #ffd670;
-	// 	cursor: pointer;
-	// }
-
 	h1 {
 		font-size: 1.625rem;
 		font-weight: 600;
 		margin-left: auto;
 		margin-right: auto;
 		letter-spacing: -0.05em;
-	}
-
-	input {
-		height: 40px; // 32px, 36px, 40px
-		width: 300px;
-	}
-	.test {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		font-weight: 500;
-		font-size: 14px;
 	}
 
 	button {

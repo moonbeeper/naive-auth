@@ -4,14 +4,18 @@
     --bg-notdark: #444444;
     --white: #ededed;
     --white-darkened: #cccccc;
+    --color-bad: #ff686b;
+    --color-bad-darkened: #bf575d;
 
     --text: var(--white);
     --text-darkened: #121212;
-    --text-link: #ffd670;
+    --text-disabled: #565656;
+    --text-placeholder: #757575; // browser's default
+    --color-yellow: #ffd670;
+    --color-yellow-darkened: #b69952; // 70% opacity
 
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    --text-tight-spacing: -0.05em;
+    --text-almost-tight-spacing: -0.025em;
 }
 
 html,
@@ -33,14 +37,43 @@ input[type="password"] {
     color: var(--text);
     border-radius: 10px;
     font-family: inherit;
-    transition: border-color 0.1s ease-out;
+    transition: all 0.1s ease-out;
+
+    &:focus {
+        border-color: var(--color-yellow);
+        // outline: 3px solid var(--color-yellow-darkened); // looks kinda bad? hm
+    }
+
+    &[data-fs-error] {
+        border-color: var(--color-bad);
+    }
+
+    &::placeholder {
+        color: var(--text-placeholder);
+    }
 }
 
-input:focus {
-    border-color: var(--bg-notdark);
-}
-
+// global link styles
 a {
-    color: var(--text-link);
+    color: var(--color-yellow);
     font-weight: 600;
+
+    &.blocked {
+        pointer-events: none;
+        color: var(--color-yellow-darkened);
+    }
+}
+
+// used to not have a gap in the layout when there's no errors
+[data-fs-field-errors]:not([data-fs-error]) {
+    display: none;
+}
+
+[aria-disabled="true"] {
+    color: var(--text-disabled) !important; // important as other styles seem to override this
+}
+
+strong {
+    font-weight: 600;
+    text-decoration: underline;
 }

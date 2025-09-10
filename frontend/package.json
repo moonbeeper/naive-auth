@@ -23,6 +23,7 @@
 		"eslint-config-prettier": "^10.0.1",
 		"eslint-plugin-svelte": "^3.0.0",
 		"globals": "^16.0.0",
+		"openapi-typescript": "^7.9.1",
 		"prettier": "^3.4.2",
 		"prettier-plugin-svelte": "^3.3.3",
 		"sass-embedded": "^1.91.0",
@@ -38,6 +39,12 @@
 		]
 	},
 	"dependencies": {
-		"@fontsource-variable/manrope": "^5.2.6"
-	}
+		"@fontsource-variable/manrope": "^5.2.6",
+		"bits-ui": "^2.9.6",
+		"formsnap": "^2.0.1",
+		"openapi-fetch": "^0.14.0",
+		"sveltekit-superforms": "^2.27.1",
+		"zod": "4.0.10"
+	},
+	"packageManager": "pnpm@10.15.1+sha512.34e538c329b5553014ca8e8f4535997f96180a1d0f614339357449935350d924e22f8614682191264ec33d1462ac21561aff97f6bb18065351c162c7e8f6de67"
 }

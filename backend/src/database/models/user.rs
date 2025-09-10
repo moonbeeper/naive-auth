@@ -47,7 +47,7 @@ impl User {
                     updated_at,
                     created_at
                 )
-            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now())
+            values ($1, LOWER($2), $3, $4, $5, $6, $7, $8, $9, now(), now())
             ",
             self.id as UserId,
             self.login,
@@ -71,16 +71,18 @@ impl User {
             update users
                 set
                     display_name = $1,
-                    email = $2,
-                    password_hash = $3,
-                    totp_secret = $4,
-                    totp_recovery_secret = $5,
-                    totp_recovery_codes = $6,
+                    email = LOWER($2),
+                    email_verified= $3,
+                    password_hash = $4,
+                    totp_secret = $5,
+                    totp_recovery_secret = $6,
+                    totp_recovery_codes = $7,
                     updated_at = now()
-            where id = $7
+            where id = $8
             ",
             self.display_name.as_ref(),
             self.email,
+            self.email_verified,
             self.password_hash.as_ref(),
             self.totp_secret.as_ref(),
             self.totp_recovery_secret.as_ref(),
@@ -97,7 +99,7 @@ impl User {
     where
         E: PgExecutor<'a>,
     {
-        let user = sqlx::query_as!(User, "select * from users where login = $1", login)
+        let user = sqlx::query_as!(User, "select * from users where login = LOWER($1)", login)
             .fetch_optional(executor)
             .await?;
 
@@ -108,7 +110,7 @@ impl User {
     where
         E: PgExecutor<'a>,
     {
-        let user = sqlx::query_as!(User, "select * from users where email = $1", email)
+        let user = sqlx::query_as!(User, "select * from users where email = LOWER($1)", email)
             .fetch_optional(executor)
             .await?;
         Ok(user)
@@ -149,7 +151,10 @@ impl User {
         E: PgExecutor<'a> + Copy,
     {
         let prefix = email.split('@').next().unwrap_or("user");
-        let parsed = any_ascii::any_ascii(prefix);
+        let mut parsed = any_ascii::any_ascii(prefix);
+        while parsed.len() < 6 {
+            parsed.push('0');
+        }
 
         let mut login = parsed.clone();
         let mut counter = 0;

@@ -49,7 +49,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
 /// Get's the info about the current user that's authenticated via a session or via an oauth2 access token.
 #[utoipa::path(
     get,
-    path = "/user",
+    path = "/user/me",
     responses(
         (status = 200, description = "User info", body = models::User),
         (status = 401, description = "Not authenticated", body = ApiHttpError),

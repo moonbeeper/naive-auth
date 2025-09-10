@@ -4,28 +4,33 @@
 
 	let {
 		type,
-		disabled,
+		disabled = false,
+		loading,
 		href,
 		children,
 		big,
 		small,
 		primary,
+		bad,
 		full_width,
+		icon,
 		...rest
 	}: HTMLButtonAttributes &
 		HTMLAnchorAttributes & {
 			// type?: HTMLButtonAttributes['type'];
-			// disabled?: HTMLButtonAttributes['disabled'];
+			disabled?: boolean;
 			// href?: HTMLAnchorAttributes['href'];
 			children?: Snippet;
 			big?: boolean;
 			small?: boolean;
 			primary?: boolean;
 			full_width?: boolean;
+			loading?: boolean;
+			bad?: boolean;
+			icon?: Snippet;
 		} = $props();
 </script>
 
-<!-- the button class is used to be able to style the button outside of this component easily VIA :global()-->
 {#if href}
 	<a
 		{...rest}
@@ -35,9 +40,11 @@
 		class:big
 		class:small
 		class:primary
-		class="button"
 		class:full_width
+		class:loading
+		class:bad
 	>
+		{@render icon?.()}
 		{@render children?.()}
 	</a>
 {:else}
@@ -48,9 +55,12 @@
 		class:big
 		class:small
 		class:primary
-		class="button"
 		class:full_width
+		class:loading
+		class:bad
+		aria-disabled={disabled}
 	>
+		{@render icon?.()}
 		{@render children?.()}
 	</button>
 {/if}
@@ -66,10 +76,17 @@
 		color: var(--text);
 		border-radius: 0.625rem;
 		font-family: inherit;
-		transition: background-color 0.1s ease-out;
+		transition: background-color outline 0.1s ease-out;
 		font-weight: 500;
 		cursor: pointer;
 		height: 36px;
+		user-select: none;
+
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		gap: 0.5rem;
 
 		&.big {
 			height: 40px;
@@ -83,6 +100,10 @@
 			background-color: var(--bg-semidark);
 		}
 
+		&[aria-disabled='true'] {
+			background-color: var(--bg-semidark);
+		}
+
 		&.primary {
 			background-color: var(--white);
 			color: var(--text-darkened);
@@ -90,9 +111,29 @@
 			&:hover {
 				background-color: var(--white-darkened);
 			}
+
+			&[aria-disabled='true'] {
+				background-color: var(--white-darkened);
+				cursor: not-allowed;
+			}
 		}
+
+		&.bad {
+			border-color: var(--color-bad-darkened);
+			color: var(--color-bad);
+		}
+
 		&.full_width {
 			width: 100%;
+		}
+
+		&.loading {
+			cursor: progress;
+		}
+
+		&:focus {
+			outline: 2px solid var(--color-yellow);
+			outline-offset: 2px;
 		}
 	}
 </style>
