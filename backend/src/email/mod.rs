@@ -20,6 +20,9 @@ struct Settings {
     domain: String,
 }
 
+// Apparently lettre has a connection timeout making so requests outside the timeout take a long time to respond,
+// because of sending emails. I do not know if this is bad or anything but sure it's annoying.
+
 #[derive(Debug)]
 pub struct EmailMan {
     mailer: Arc<AsyncSmtpTransport<Tokio1Executor>>,

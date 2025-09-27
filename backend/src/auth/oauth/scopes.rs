@@ -38,6 +38,9 @@ impl Display for OauthScope {
 
 impl OauthScope {
     pub fn as_vec(self) -> Vec<String> {
-        self.to_string().split(',').map(String::from).collect()
+        self.to_string()
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect()
     }
 }

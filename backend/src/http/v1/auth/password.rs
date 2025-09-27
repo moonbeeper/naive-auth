@@ -14,9 +14,8 @@ use crate::{
     auth::{
         middleware::AuthContext,
         ops::{
-            DeviceMetadata, TOTP_CODE_REGEX, TotpResponse, create_session,
-            create_totp_login_exchange, get_totp_client, get_totp_recovery_codes, remove_session,
-            totp_secret,
+            DeviceMetadata, TOTP_CODE_REGEX, create_session, create_totp_login_exchange,
+            get_totp_client, get_totp_recovery_codes, remove_session,
         },
     },
     database::{
@@ -31,7 +30,7 @@ use crate::{
     http::{
         HttpResult, PASSWORD_TAG,
         error::{ApiError, ApiHttpError},
-        v1::{JsonEither, models, string_trim},
+        v1::{models, string_trim},
         validation::{Json, Path, Valid},
     },
 };
@@ -39,7 +38,7 @@ use crate::{
 pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
     OpenApiRouter::new()
         .routes(routes!(login))
-        .routes(routes!(register))
+        // .routes(routes!(register)) Can only register through OTP and then set a password via recovery
         .routes(routes!(reset_password))
         .routes(routes!(reset_password_status))
         .routes(routes!(reset_password_check))
@@ -89,24 +88,25 @@ async fn login(
         return Err(ApiError::InvalidLogin);
     };
 
-    if !user.email_verified {
-        let code = get_totp_client(&totp_secret().to_encoded()).generate_current()?;
-        AuthFlow::VerifyEmail { code: code.clone() }
-            .store(
-                AuthFlowNamespace::VerifyEmail,
-                AuthFlowKey::UserId(user.id),
-                &global.redis,
-            )
-            .await?;
+    // Emails will be always verified because of the requirement of having to log in with OTP beforehand
+    // if !user.email_verified {
+    //     let code = get_totp_client(&totp_secret().to_encoded()).generate_current()?;
+    //     AuthFlow::VerifyEmail { code: code.clone() }
+    //         .store(
+    //             AuthFlowNamespace::VerifyEmail,
+    //             AuthFlowKey::UserId(user.id),
+    //             &global.redis,
+    //         )
+    //         .await?;
 
-        let mail = AuthEmails::VerifyEmail {
-            login: user.login,
-            code,
-        };
+    //     let mail = AuthEmails::VerifyEmail {
+    //         login: user.login,
+    //         code,
+    //     };
 
-        global.mailer.send(&user.email, mail).await?;
-        return Err(ApiError::EmailIsNotVerified);
-    }
+    //     global.mailer.send(&user.email, mail).await?;
+    //     return Err(ApiError::EmailIsNotVerified);
+    // }
 
     if user.password_hash.is_none() {
         Err(ApiError::InvalidLogin)?;
@@ -141,86 +141,89 @@ async fn login(
     Ok(Json(models::Session::from(sess.session)))
 }
 
-#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
-pub struct RegisterPassword {
-    #[validate(email)]
-    email: String,
-    #[validate(length(min = 6))]
-    login: String,
-    #[validate(length(min = 8))]
-    password: String,
-}
+// #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+// pub struct RegisterPassword {
+//     #[validate(email)]
+//     email: String,
+//     #[validate(
+//         length(min = 6),
+//         regex(path = "crate::database::models::user::USER_EMAIL_REGEX")
+//     )]
+//     login: String,
+//     #[validate(length(min = 8))]
+//     password: String,
+// }
 
-/// Register via email and password
-///
-/// Register a new user with the provided email, password and login. You'll need to verify your email after registering.
-#[utoipa::path(
-    post,
-    path = "/register",
-    request_body = RegisterPassword,
-    responses(
-        (status = 200, description = "Account registered, verify your email lol"),
-        (status = 400, description = "Invalid input or already exists", body = ApiHttpError),
-    ),
-    tag = PASSWORD_TAG
-)]
-async fn register(
-    State(global): State<Arc<GlobalState>>,
-    Extension(session): Extension<AuthContext>,
-    cookies: Cookies,
-    Valid(Json(request)): Valid<Json<RegisterPassword>>,
-) -> HttpResult<()> {
-    remove_session(session, &cookies, &global).await?; // force logout
+// /// Register via email and password
+// ///
+// /// Register a new user with the provided email, password and login. You'll need to verify your email after registering.
+// #[utoipa::path(
+//     post,
+//     path = "/register",
+//     request_body = RegisterPassword,
+//     responses(
+//         (status = 200, description = "Account registered, verify your email lol"),
+//         (status = 400, description = "Invalid input or already exists", body = ApiHttpError),
+//     ),
+//     tag = PASSWORD_TAG
+// )]
+// async fn register(
+//     State(global): State<Arc<GlobalState>>,
+//     Extension(session): Extension<AuthContext>,
+//     cookies: Cookies,
+//     Valid(Json(request)): Valid<Json<RegisterPassword>>,
+// ) -> HttpResult<()> {
+//     remove_session(session, &cookies, &global).await?; // force logout
 
-    let login = any_ascii::any_ascii(&request.login);
+//     let login = any_ascii::any_ascii(&request.login); // is this necessary? am using a regex anyway ????
 
-    // early checks before doing costly, waiting time ops (db query)
-    let strength = zxcvbn::zxcvbn(&request.password, &[&login, &request.email]).score();
-    if strength < zxcvbn::Score::Three {
-        return Err(ApiError::PasswordLowStrength);
-    }
+//     // early checks before doing costly, waiting time ops (db query)
+//     let strength = zxcvbn::zxcvbn(&request.password, &[&login, &request.email]).score();
+//     if strength < zxcvbn::Score::Three {
+//         return Err(ApiError::PasswordLowStrength);
+//     }
 
-    if User::get_by_email_or_login(&request.email, &request.login, &global.database)
-        .await?
-        .is_some()
-    {
-        return Err(ApiError::UserAlreadyExists);
-    }
+//     if User::get_by_email_or_login(&request.email, &request.login, &global.database)
+//         .await?
+//         .is_some()
+//     {
+//         return Err(ApiError::UserAlreadyExists);
+//     }
 
-    let argon2 = Argon2::default();
-    let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());
-    let password_hash = argon2
-        .hash_password(request.password.as_bytes(), &salt)?
-        .to_string();
+//     let argon2 = Argon2::default();
+//     let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());
+//     let password_hash = argon2
+//         .hash_password(request.password.as_bytes(), &salt)?
+//         .to_string();
 
-    let user = User::builder()
-        .login(login)
-        .email(request.email.clone())
-        .email_verified(false)
-        .password_hash(password_hash)
-        .build();
+//     let user = User::builder()
+//         .login(login)
+//         .email(request.email.clone())
+//         .email_verified(false)
+//         .password_hash(password_hash)
+//         .build();
 
-    let mut tx = global.database.begin().await?;
-    user.insert(&mut tx).await?;
-    tx.commit().await?;
+//     let mut tx = global.database.begin().await?;
+//     user.insert(&mut tx).await?;
+//     tx.commit().await?;
 
-    let code = get_totp_client(&totp_secret().to_encoded()).generate_current()?;
-    AuthFlow::VerifyEmail { code: code.clone() }
-        .store(
-            AuthFlowNamespace::VerifyEmail,
-            AuthFlowKey::UserId(user.id),
-            &global.redis,
-        )
-        .await?;
+//     let code = get_totp_client(&totp_secret().to_encoded()).generate_current()?;
+//     AuthFlow::VerifyEmail { code: code.clone() }
+//         .store(
+//             AuthFlowNamespace::VerifyEmail,
+//             AuthFlowKey::UserId(user.id),
+//             &global.redis,
+//         )
+//         .await?;
 
-    let mail = AuthEmails::VerifyEmail {
-        login: user.login,
-        code,
-    };
-    global.mailer.send(&user.email, mail).await?;
+//     let mail = AuthEmails::VerifyEmail {
+//         login: user.login,
+//         code,
+//     };
+//     global.mailer.send(&user.email, mail).await?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
 pub struct ResetPassword {
@@ -238,6 +241,8 @@ pub struct ResetPassword {
     request_body = ResetPassword,
     responses(
         (status = 200, description = "Started the password reset flow, check your email"),
+        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 422, description = "Missing required fields", body = ApiHttpError),
     ),
     tag = PASSWORD_TAG
 )]
@@ -255,19 +260,23 @@ async fn reset_password(
 
     let flow_id = FlowId::new();
 
-    let flow = AuthFlow::PasswordReset {
+    AuthFlow::PasswordReset {
         user_id: user.id,
         has_totp: user.totp_secret.is_some(),
         totp_verified: false,
-    };
-    flow.store(
+    }
+    .store(
         AuthFlowNamespace::PasswordReset,
         AuthFlowKey::FlowId(flow_id),
         &global.redis,
     )
     .await?;
 
-    let reset_url = format!("{}/reset/{flow_id}", global.settings.http.frontend_url); // frontend should handle this
+    // frontend url!
+    let reset_url = format!(
+        "{}/reset-password/{flow_id}",
+        global.settings.http.frontend_url
+    );
     let email = AuthEmails::PasswordReset {
         reset_url,
         raw_code: flow_id.to_string(),
@@ -284,10 +293,10 @@ pub struct ResetPasswordPath {
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
-#[serde(rename_all = "lowercase")] // I really don't know if I should return it like this
+#[serde(rename_all = "snake_case")] // I really don't know if I should return it like this
 enum ResetStatus {
     Ready,
-    Totp,
+    NeedsTotp,
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
@@ -295,7 +304,9 @@ pub struct ResetPasswordStatus {
     status: ResetStatus,
 }
 // useless in an aspect, but useful in the other. or that's what i think haha
-/// Get the available options to reset the password.
+/// Get the current status of the password reset flow.
+///
+/// This endpoint is just used for checking if the password reset flow requires TOTP verification or not to continue.
 #[utoipa::path(
     get,
     path = "/reset/{id}",
@@ -324,10 +335,16 @@ async fn reset_password_status(
     )
     .await?;
 
-    if let Some(AuthFlow::PasswordReset { has_totp, .. }) = flow {
-        if has_totp {
+    // This could have been just a bool but whatever. it makes it more descriptive
+    if let Some(AuthFlow::PasswordReset {
+        has_totp,
+        totp_verified,
+        ..
+    }) = flow
+    {
+        if has_totp && !totp_verified {
             return Ok(Json(ResetPasswordStatus {
-                status: ResetStatus::Totp,
+                status: ResetStatus::NeedsTotp,
             }));
         }
 
@@ -394,13 +411,12 @@ async fn reset_password_check(
             return Err(ApiError::RecoveryLinkNotFound);
         };
 
-        if user.totp_secret.is_none() {
-            return Err(ApiError::RecoveryLinkNotFound); // yup. extra check just so there's a bug in another place
-        }
+        let Some(ref totp_secret) = user.totp_secret else {
+            return Err(ApiError::RecoveryLinkNotFound);
+        };
 
         if TOTP_CODE_REGEX.is_match(&request.code_or_recovery) {
-            let totp =
-                get_totp_client(&totp_rs::Secret::Encoded(user.totp_secret.clone().unwrap()));
+            let totp = get_totp_client(&totp_rs::Secret::Encoded(totp_secret.clone()));
 
             if !totp.check_current(&request.code_or_recovery)? {
                 return Err(ApiError::InvalidTOTPCode(request.code_or_recovery));
@@ -528,6 +544,19 @@ async fn reset_password_set(
             return Err(ApiError::PasswordLowStrength);
         }
 
+        if let Some(ref password_hash) = user.password_hash {
+            let argon2 = Argon2::default();
+            if argon2
+                .verify_password(
+                    request.password.as_bytes(),
+                    &PasswordHash::new(password_hash)?,
+                )
+                .is_ok()
+            {
+                return Err(ApiError::PasswordMatchesOld)?;
+            }
+        }
+
         AuthFlow::remove(
             AuthFlowNamespace::PasswordReset,
             AuthFlowKey::FlowId(path.id),
@@ -548,6 +577,9 @@ async fn reset_password_set(
         Session::delete_all_by_user(user.id, &mut tx).await?;
         user.update(&mut tx).await?;
         tx.commit().await?;
+
+        let mail = AuthEmails::PasswordResetFinished { login: user.login };
+        global.mailer.send(&user.email, mail).await?;
 
         return Ok(());
     }

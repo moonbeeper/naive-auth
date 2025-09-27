@@ -32,13 +32,44 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Start the OAuth authorization process
-         * @description This will return a Link ID with the requested scopes to be authorized or refused by the user
+         * Start the OAuth authorization request
+         * @description Starts the OAuth authorization by first validating the request and then appending a temporary cookie with the
+         *     necessary information to continue the process. If the user has already authorized the app with the requested scopes,
+         *     it will skip the consent prompt and redirect the user to the client's callback with the code directly.
          */
-        get: operations["pre_authorize"];
+        get: operations["authorize"];
         put?: never;
-        /** Exchange the Link ID to authorize or deny the OAuth request */
-        post: operations["authorize"];
+        /**
+         * Finish a OAuth authorization request
+         * @description Finish the OAuth authorization request by approving or denying it. If approved, the user will be redirected to the
+         *     client's callback. This consumes the authorization flow, so it cannot be used again.
+         */
+        post: operations["finish_authorize"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/oauth/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get information about the current OAuth authorization request
+         * @description Its used to get the info about the app and requested scopes before approving or denying the request without
+         *     consuming the authorization flow. To be able to use it, the user must have a previously started the authorization
+         *     flow.
+         *
+         *     If the request has new scopes that the user has not approved yet, they won't be added until the oauth client has
+         *     exchanged the code response for a access token. That also means that the user's authorized app won't be updated.
+         */
+        get: operations["get_info"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -54,7 +85,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Exchange a OAuth code for a access token */
+        /**
+         * Exchange a OAuth code for a access token
+         * @description Exchanges a previously obtained OAuth code for an access token to be used in future requests. The token will be
+         *     valid until the user revokes the authorization or the OAuth app is deleted. The code will be consumed after
+         *     the first pass of validation, after the second pass (code challenge, etc) it will be consumed and you will need to
+         *     restart the authorization process from the beginning.
+         */
         post: operations["authOauthToken"];
         delete?: never;
         options?: never;
@@ -116,26 +153,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/register": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Register via email and password
-         * @description Register a new user with the provided email, password and login. You'll need to verify your email after registering.
-         */
-        post: operations["register"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/auth/reset": {
         parameters: {
             query?: never;
@@ -163,7 +180,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get the available options to reset the password. */
+        /**
+         * Get the current status of the password reset flow.
+         * @description This endpoint is just used for checking if the password reset flow requires TOTP verification or not to continue.
+         */
         get: operations["reset_password_status"];
         put?: never;
         post?: never;
@@ -273,7 +293,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Exchange a Link ID to finalize a TOTP request flow */
+        /** Exchange a Link ID to finalize a Sudo enable TOTP flow */
         post: operations["exchange"];
         delete?: never;
         options?: never;
@@ -292,26 +312,6 @@ export interface paths {
         put?: never;
         /** Exchange a Link ID to finalize a TOTP login request */
         post: operations["exchange_login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/auth/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verify an email address
-         * @description This will verify the email address of a user, allowing them to login with password.
-         */
-        post: operations["verify_email"];
         delete?: never;
         options?: never;
         head?: never;
@@ -582,7 +582,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        ApiHttpError: "Database" | "InvalidLogin" | "PasswordHashing" | "UserAlreadyExists" | "Unknown" | "UnknownAlt" | "EmailError" | "RedisError" | "SystemTimeError" | "InvalidOTPCode" | "InvalidTOTPCode" | "TOTPIsRequired" | "Teapot" | "TOTPIsAlreadyEnabled" | "YouAreNotLoggedIn" | "InvalidRecoveryCode" | "UsedRecoveryCode" | "TOTPIsNotEnabled" | "OTPRecoveryFlowNotFound" | "TOTPFlowNotFound" | "EmailIsNotVerified" | "EmailIsAlreadyVerified" | "InvalidEmailVerification" | "InvalidAuthentication" | "FailedParsingScopes" | "OAuthAppNotFound" | "OAuthAppNotOwned" | "OAuthAppEmptyScopes" | "OAuthAuthorizationNotFound" | "SudoIsNotEnabled" | "SudoIsAlreadyEnabled" | "SudoCannotBeEnabled" | "TOTPExchangeNotFound" | "OTPExchangeNotFound" | "SessionDoesNotExist" | "FailedParsingURL" | "OAuthInvalidUri" | "PasswordDoesNotMatch" | "PasswordLowStrength" | "RecoveryLinkNotFound" | "ValidationError" | "JsonSyntaxError" | "JsonDataError" | "MissingJsonContentType" | "FailedToBufferContent" | "FailedToDeserializePathParams" | "MissingPathParams" | "FailedToDeserializeQuery";
+        ApiHttpError: "Database" | "InvalidLogin" | "PasswordHashing" | "UserAlreadyExists" | "Unknown" | "UnknownAlt" | "EmailError" | "RedisError" | "SystemTimeError" | "InvalidOTPCode" | "InvalidTOTPCode" | "TOTPIsRequired" | "Teapot" | "TOTPIsAlreadyEnabled" | "YouAreNotLoggedIn" | "InvalidRecoveryCode" | "UsedRecoveryCode" | "TOTPIsNotEnabled" | "OTPRecoveryFlowNotFound" | "TOTPFlowNotFound" | "EmailIsNotVerified" | "EmailIsAlreadyVerified" | "InvalidEmailVerification" | "InvalidAuthentication" | "FailedParsingScopes" | "OAuthAppNotFound" | "OAuthAppNotOwned" | "OAuthAppEmptyScopes" | "OAuthAuthorizationNotFound" | "SudoIsNotEnabled" | "SudoIsAlreadyEnabled" | "SudoCannotBeEnabled" | "TOTPExchangeNotFound" | "OTPExchangeNotFound" | "SessionDoesNotExist" | "FailedParsingURL" | "OAuthInvalidUri" | "PasswordDoesNotMatch" | "PasswordLowStrength" | "RecoveryLinkNotFound" | "ValidationError" | "JsonSyntaxError" | "JsonDataError" | "MissingJsonContentType" | "FailedToBufferContent" | "FailedToDeserializePathParams" | "MissingPathParams" | "FailedToDeserializeQuery" | "EmailVerificationExpired" | "PasswordMatchesOld" | "OauthFlowNotFound" | "FailedToDeserializeForm" | "FailedToDeserializeFormBody" | "MissingFormContentType";
         AuthExchange: {
             /** @description The code that was sent to the email address */
             code: string;
@@ -591,12 +591,6 @@ export interface components {
             link_id: components["schemas"]["Ulid"];
         };
         AuthResponse: {
-            link_id: components["schemas"]["Ulid"];
-        };
-        Authorize: {
-            /** @description Whether to authorize or deny the request */
-            authorize: boolean;
-            /** @description The link ID of the OAuth authorization flow */
             link_id: components["schemas"]["Ulid"];
         };
         /** @enum {string} */
@@ -661,27 +655,15 @@ export interface components {
             scope: string;
             token_type: components["schemas"]["TokenType"];
         };
+        FinishAuthorize: {
+            /** @description Whether to authorize or deny the request */
+            authorize: boolean;
+        };
         /** @enum {string} */
         GrantType: "authorization_code";
         HttpError: {
             error: string;
             link_id?: string | null;
-            message: string;
-        };
-        JsonEither_Session_TotpResponse: {
-            /** Format: date-time */
-            active_expires_at: string;
-            browser: string;
-            /** Format: date-time */
-            created_at: string;
-            id: components["schemas"]["Ulid"];
-            /** Format: date-time */
-            inactive_expires_at: string;
-            name: string;
-            os: string;
-        } | {
-            error: string;
-            link_id: components["schemas"]["Ulid"];
             message: string;
         };
         Login: {
@@ -711,17 +693,19 @@ export interface components {
             updated_at: string;
             user_id: components["schemas"]["Ulid"];
         };
-        /** @enum {string} */
-        OauthResponseType: "code" | "token" | "token code" | "code token";
-        PreAuthorizeResponse: {
-            link_id: components["schemas"]["Ulid"];
+        OauthHttpError: {
+            error: string;
+            error_description: string;
+            state?: string | null;
+        };
+        OauthInformation: {
+            id: components["schemas"]["StringId"];
+            name: string;
+            redirect_uri: string;
             scopes: string[];
         };
-        RegisterPassword: {
-            email: string;
-            login: string;
-            password: string;
-        };
+        /** @enum {string} */
+        OauthResponseType: "code" | "token" | "token code" | "code token";
         ResetPassword: {
             email: string;
         };
@@ -739,7 +723,7 @@ export interface components {
             status: components["schemas"]["ResetStatus"];
         };
         /** @enum {string} */
-        ResetStatus: "ready" | "totp";
+        ResetStatus: "ready" | "needs_totp";
         Session: {
             /** Format: date-time */
             active_expires_at: string;
@@ -778,11 +762,6 @@ export interface components {
         TotpRecoveryResponse: {
             recovery_codes: string[];
         };
-        TotpResponse: {
-            error: string;
-            link_id: components["schemas"]["Ulid"];
-            message: string;
-        };
         /** Format: ulid */
         Ulid: string;
         UpdateApp: {
@@ -816,11 +795,6 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
-        VerifyEmail: {
-            /** @description The code that was sent to the email address */
-            code: string;
-            email: string;
-        };
     };
     responses: never;
     parameters: never;
@@ -843,13 +817,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful login, session or TOTP challenge */
+            /** @description Successful login, exchanged for a new session */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JsonEither_Session_TotpResponse"];
+                    "application/json": components["schemas"]["Session"];
                 };
             };
             /** @description Bad request (invalid login, email not verified, etc) */
@@ -861,9 +835,18 @@ export interface operations {
                     "application/json": components["schemas"]["HttpError"];
                 };
             };
+            /** @description TOTP challenge required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HttpError"];
+                };
+            };
         };
     };
-    pre_authorize: {
+    authorize: {
         parameters: {
             query: {
                 /** @description The OAuth response type, must be code! */
@@ -887,21 +870,21 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Pre-authorization response */
-            200: {
+            /** @description Redirect to consent prompt or already authorized (redirected to client) */
+            303: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["PreAuthorizeResponse"];
-                };
+                content?: never;
             };
             /** @description OAuth error, validation or parsing error */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["OauthHttpError"];
+                };
             };
             /** @description Not authenticated */
             401: {
@@ -923,7 +906,7 @@ export interface operations {
             };
         };
     };
-    authorize: {
+    finish_authorize: {
         parameters: {
             query?: never;
             header?: never;
@@ -932,7 +915,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Authorize"];
+                "application/json": components["schemas"]["FinishAuthorize"];
             };
         };
         responses: {
@@ -959,6 +942,44 @@ export interface operations {
             };
             /** @description Missing required fields */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HttpError"];
+                };
+            };
+        };
+    };
+    get_info: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Information about the current OAuth2 authorization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OauthInformation"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HttpError"];
+                };
+            };
+            /** @description OAuth authorization flow was not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1079,7 +1100,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Exchanged for session or TOTP challenge */
+            /** @description Exchanged for a new session */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1090,6 +1111,15 @@ export interface operations {
             };
             /** @description Validation or parsing error */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HttpError"];
+                };
+            };
+            /** @description TOTP challenge required */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1150,37 +1180,6 @@ export interface operations {
             };
         };
     };
-    register: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegisterPassword"];
-            };
-        };
-        responses: {
-            /** @description Account registered, verify your email lol */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Invalid input or already exists */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HttpError"];
-                };
-            };
-        };
-    };
     reset_password: {
         parameters: {
             query?: never;
@@ -1200,6 +1199,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation or parsing error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HttpError"];
+                };
+            };
+            /** @description Missing required fields */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HttpError"];
+                };
             };
         };
     };
@@ -1580,55 +1597,6 @@ export interface operations {
             };
             /** @description Missing required fields */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HttpError"];
-                };
-            };
-        };
-    };
-    verify_email: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VerifyEmail"];
-            };
-        };
-        responses: {
-            /** @description Email verified successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation or parsing error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HttpError"];
-                };
-            };
-            /** @description Not authenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HttpError"];
-                };
-            };
-            /** @description Email has been already verified */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

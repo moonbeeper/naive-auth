@@ -16,7 +16,7 @@
 		width: 100%;
 		height: 5.75rem;
 		display: flex;
-		font-size: 3.125rem;
+		font-size: 3rem;
 		font-weight: 400;
 		align-items: center;
 		color: var(--text);
@@ -30,25 +30,15 @@
 
 		&:first-child {
 			border-radius: 0.625rem 0 0 0.625rem;
-			// border-end-end-radius: 0;
-			// border-start-end-radius: 0;
 		}
 
 		&:not(:first-child) {
-			border-left: 0; // beautiful
+			border-left: 0;
 		}
 
 		&:last-child {
 			border-radius: 0 0.625rem 0.625rem 0;
 		}
-
-		// &[data-active] {  makes it appear as unused
-		// 	border: 2px solid var(--color-yellow);
-		// }
-		// :global([data-active]) {
-		// 	border: 2px solid var(--color-yellow);
-		// 	color: red;
-		// }
 	}
 
 	:global([data-pin-input-cell][data-active]) {
@@ -57,12 +47,17 @@
 		border: 1px solid var(--color-yellow-darkened);
 	}
 
+	@media (max-width: 425px) {
+		:global([data-pin-input-cell]) {
+			height: 3.75rem;
+			font-size: 2.5rem;
+		}
+	}
+
 	.caret {
 		border: 1px solid var(--text);
-
 		width: 1px;
 		height: 32px;
-
 		animation: blink 1500ms cubic-bezier(0.075, 0.82, 0.165, 1) infinite; // can't use 1.5s?
 	}
 

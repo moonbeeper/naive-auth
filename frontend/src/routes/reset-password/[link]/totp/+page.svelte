@@ -16,12 +16,13 @@
 	import client, { type ApiHttpError } from '$lib/api/baseFetch';
 	import { goto } from '$app/navigation';
 	import { Control, Field } from 'formsnap';
-	import Spinner from '../../../components/spinner.svelte';
-	import PinInput from '../../../components/forms/PinInput';
-	import Button from '../../../components/button.svelte';
+	import PinInput from '$comps/forms/PinInput';
+	import Spinner from '$comps/spinner.svelte';
+	import Button from '$comps/button.svelte';
+	import { error } from '@sveltejs/kit';
 
 	let { data }: PageProps = $props();
-	currentText.set('2FA Login');
+	currentText.set('Reset Password 2FA');
 
 	let recoveryMode = $state(false);
 
@@ -30,23 +31,30 @@
 		SPA: true,
 		onUpdate: async ({ form: f }) => {
 			if (f.valid) {
-				const res = await client.POST('/v1/auth/totp/exchange-login', {
+				const res = await client.POST('/v1/auth/reset/{id}/verify', {
 					body: {
-						code_or_recovery: f.data.code,
-						link_id: data.link
+						code_or_recovery: f.data.code
+					},
+					params: {
+						path: {
+							id: data.link
+						}
 					}
 				});
 
 				if (res.error?.error === ('InvalidTOTPCode' as ApiHttpError)) {
 					sMessage(f, res.error.message);
 					codeForm.reset();
+				} else if (res.error?.error === ('RecoveryLinkNotFound' as ApiHttpError)) {
+					error(400, 'Invalid password reset link');
 				} else if (res.error) {
 					console.error(res.error);
 					await goto('/'); // redirect with flash? idk
 				}
 
 				if (res.response.ok) {
-					await goto('/yay');
+					const template = '/reset-password/{id}';
+					await goto(template.replace('{id}', data.link)); // go back to main reset page to set new password
 				}
 			}
 		}
@@ -58,10 +66,14 @@
 		onUpdate: async ({ form: f }) => {
 			if (f.valid) {
 				const recovery = f.data.recovery.slice(0, 5) + '-' + f.data.recovery.slice(5, 10);
-				const res = await client.POST('/v1/auth/totp/exchange-login', {
+				const res = await client.POST('/v1/auth/reset/{id}/verify', {
 					body: {
-						code_or_recovery: recovery,
-						link_id: data.link
+						code_or_recovery: recovery
+					},
+					params: {
+						path: {
+							id: data.link
+						}
 					}
 				});
 
@@ -71,12 +83,15 @@
 				} else if (res.error?.error === ('InvalidRecoveryCode' as ApiHttpError)) {
 					sMessage(f, res.error.message);
 					codeForm.reset();
+				} else if (res.error?.error === ('RecoveryLinkNotFound' as ApiHttpError)) {
+					error(400, 'Invalid password reset link');
 				} else if (res.error) {
 					await goto('/'); // redirect with flash? idk
 				}
 
 				if (res.response.ok) {
-					await goto('/yay');
+					const template = '/reset-password/{id}';
+					await goto(template.replace('{id}', data.link)); // go back to main reset page to set new password
 				}
 			}
 		}

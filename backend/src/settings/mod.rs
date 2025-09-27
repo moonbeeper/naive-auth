@@ -14,6 +14,8 @@ pub struct HttpSettings {
     pub api_explorer: bool,
     #[default("http://127.0.0.1:5173")]
     pub frontend_url: String,
+    #[default(false)]
+    pub secure_cookies: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]
@@ -35,8 +37,6 @@ pub struct SessionSettings {
     pub active_age: i64,
     #[default(60*60*24*30)]
     pub inactive_age: i64,
-    #[default(false)]
-    pub secure_cookies: bool,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SmartDefault)]
@@ -82,19 +82,14 @@ pub struct RedisSettings {
     pub max_connections: usize,
 }
 
-// // should probably merge the jwt secret too.
-// #[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug, SmartDefault)]
-// pub struct AuthSecrets {
-//     #[default("CHANGE_ME_OR_ELSE_YOU_ARE_SCREWED")]
-//     pub totp_secret: String,
-//     #[default("CHANGE_ME_OR_ELSE_YOU_ARE_SCREWED")]
-//     pub otp_secret: String,
-// }
-
 #[derive(serde::Deserialize, serde::Serialize, Debug, SmartDefault)]
 pub struct OauthSettings {
     #[default("bo")]
     pub token_prefix: String,
+    #[default("BOASESS")]
+    pub cookie_name: String,
+    pub jwt: JwtSettings,
+    pub issuer: Option<String>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, SmartDefault)]
@@ -124,11 +119,10 @@ pub enum LoggingSettingsFormat {
 pub struct Settings {
     pub http: HttpSettings,
     pub database: DatabaseSettings,
+    pub redis: RedisSettings,
+    pub oauth: OauthSettings,
     pub session: SessionSettings,
     pub email: EmailSettings,
-    pub redis: RedisSettings,
-    // pub secrets: AuthSecrets,
-    pub oauth: OauthSettings,
     pub logging: LoggingSettings,
 }
 

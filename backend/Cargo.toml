@@ -8,7 +8,7 @@ edition = "2024"
 [dependencies]
 beepauth_macros = { path = "macros" }
 any_ascii = "0.3.3"
-anyhow = "1.0.98"
+anyhow = "1.0.100"
 argon2 = { version = "0.5.3", features = ["std"] }
 axum = { version = "0.8.4", features = ["http2", "macros"] }
 axum-valid = { version = "0.24.0", features = ["into_json"] }
@@ -16,9 +16,9 @@ base32 = "0.5.1"
 base64 = "0.22.1"
 bitflags = { version = "2.9.4", features = ["std"] }
 blake3 = "1.8.2"
-chrono = { version = "0.4.41", features = ["serde"] }
-clap = { version = "4.5.47", features = ["derive"] }
-config = "0.15.15"
+chrono = { version = "0.4.42", features = ["serde"] }
+clap = { version = "4.5.48", features = ["derive"] }
+config = "0.15.17"
 either = "1.15.0"
 fred = { version = "10.1.0", features = ["serde_json"] }
 futures-util = "0.3.31"
@@ -27,7 +27,7 @@ lettre = { version = "0.11.18", features = ["tokio1-native-tls"] }
 rand = "=0.6.4" # god dammit argon2. make that breaking release for once.
 rand_chacha = "=0.3.1"
 regex = "1.11.2"
-serde = { version = "1.0.219", features = ["derive"] }
+serde = { version = "1.0.227", features = ["derive"] }
 serde_json = "1.0.143"
 serde_urlencoded = "0.7.1"
 sha2 = "0.10.9"
@@ -58,7 +58,7 @@ tower-cookies = "0.11.0"
 tower-http = { version = "0.6.6", features = ["add-extension", "cors"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-typed-builder = "0.21.2"
+typed-builder = "0.22.0"
 ulid = { version = "1.2.1", features = ["serde", "uuid"] }
 url = "2.5.7"
 utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "ulid"] }
@@ -68,3 +68,10 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 uuid = { version = "1.18.1", features = ["v4"] }
 validator = { version = "0.20.0", features = ["derive"] }
 zxcvbn = "3.1.0"
+axum-helmet = "0.2.0"
+
+[profile.dist]
+inherits = "release"
+lto = "fat"
+debug = false
+strip = true

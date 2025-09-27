@@ -14,7 +14,6 @@
 
 <style lang="scss">
 	label {
-		font: inherit; // should inherit everything else but the things bellow
 		font-weight: 500;
 		font-size: 0.875rem;
 		transition: color 0.1s ease-out;

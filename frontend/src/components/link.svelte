@@ -4,9 +4,9 @@
 
 	let {
 		children,
-		blocked,
+		disabled = false,
 		...rest
-	}: { children?: Snippet; blocked?: boolean } & HTMLAnchorAttributes = $props();
+	}: { children?: Snippet; disabled?: boolean } & HTMLAnchorAttributes = $props();
 </script>
 
-<a {...rest} class:blocked>{@render children?.()}</a>
+<a {...rest} aria-disabled={disabled}>{@render children?.()}</a>

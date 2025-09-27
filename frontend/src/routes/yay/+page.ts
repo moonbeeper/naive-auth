@@ -1,11 +1,10 @@
 import { browser } from '$app/environment';
-import { redirectIfAuthenticated, updateAuth } from '$lib/auth';
+import { redirectIfNotAuthenticated, updateAuth } from '$lib/auth';
 import type { PageLoad } from './$types';
-
 
 export const load: PageLoad = async ({ fetch }) => {
 	if (!browser) return;
 	await updateAuth(fetch);
-	redirectIfAuthenticated();
+	redirectIfNotAuthenticated();
 	return;
 };

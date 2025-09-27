@@ -13,7 +13,10 @@ use tower::Service;
 use tower_cookies::Cookies;
 
 use crate::{
-    auth::{ops::build_cookie, ticket::AuthTicket},
+    auth::{
+        ops::{build_cookie, delete_cookie},
+        ticket::SessionTicket,
+    },
     database::models::{
         session::{Session, SessionId},
         user::UserId,
@@ -85,19 +88,31 @@ impl<S: Send + Sync + 'static> AuthManagerMiddleware<S> {
             return Ok(AuthContext::NotAuthenticated);
         };
 
-        let token_value = session_cookie.value().to_string();
+        let token_value = session_cookie.value_trimmed();
         tracing::debug!("session cookie found");
 
-        let Ok(token) = AuthTicket::validate(&token_value, &self.global.settings) else {
+        let Ok(token) = SessionTicket::validate(token_value, &self.global.settings) else {
             tracing::debug!("invalid token");
             // let cookie = Cookie::build((self.global.settings.session.cookie_name.as_str(), "")).path("/");
-            cookies.remove(cookie_name.into());
+            // cookies.remove(cookie_name.into());
+            let cookie = delete_cookie(
+                self.global.settings.session.cookie_name.clone(),
+                self.global.settings.http.secure_cookies,
+            );
+            cookies.add(cookie);
+
             return Ok(AuthContext::NotAuthenticated);
         };
 
         let Ok(Some(session)) = Session::get(token.session_id, &self.global.database).await else {
             // let cookie = Cookie::build((&cookie_name, "")).path("/");
-            cookies.remove(cookie_name.into());
+            // cookies.remove(cookie_name.into());
+            let cookie = delete_cookie(
+                self.global.settings.session.cookie_name.clone(),
+                self.global.settings.http.secure_cookies,
+            );
+            cookies.add(cookie);
+
             return Ok(AuthContext::NotAuthenticated);
         };
 
@@ -106,7 +121,13 @@ impl<S: Send + Sync + 'static> AuthManagerMiddleware<S> {
         if session.is_expired() {
             tracing::debug!("session is expired");
             // let cookie = Cookie::build((SESSION_COOKIE_NAME, "")).path("/");
-            cookies.remove(cookie_name.into());
+            // cookies.remove(cookie_name.into());
+            let cookie = delete_cookie(
+                self.global.settings.session.cookie_name.clone(),
+                self.global.settings.http.secure_cookies,
+            );
+            cookies.add(cookie);
+
             return Ok(AuthContext::NotAuthenticated);
         }
 
@@ -121,11 +142,11 @@ impl<S: Send + Sync + 'static> AuthManagerMiddleware<S> {
             session.update(&mut tx).await?;
             tx.commit().await?;
 
-            let ticket = AuthTicket::from(&session).generate(&self.global.settings)?;
+            let ticket = SessionTicket::from(&session).generate(&self.global.settings)?;
             let cookie = build_cookie(
                 cookie_name,
                 self.global.settings.session.inactive_age,
-                self.global.settings.session.secure_cookies,
+                self.global.settings.http.secure_cookies,
                 ticket,
             );
             cookies.add(cookie);

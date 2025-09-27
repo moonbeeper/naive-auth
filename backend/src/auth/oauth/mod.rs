@@ -30,7 +30,7 @@ pub enum OauthErrorKind {
     AccessDenied,
     // #[error("please change me")]
     // UnauthorizedClient, // unused. maybe useful for disabled clients?
-    #[error("The requested scope is invalid, unknown, or malformed")]
+    #[error("The requested scope is invalid, unknown, malformed or not allowed with this app")]
     InvalidScope,
     #[error("We do not support obtaining an authorization code using this method")]
     UnsupportedResponseType,
@@ -56,8 +56,8 @@ pub enum OauthErrorKind {
     InvalidRedirectUri,
     #[error("Failed to make a valid URL from the redirect URI")]
     FailedMakingUrl,
-    #[error("The Authorize ID provided is invalid or does not exist on our papers")]
-    InvalidAuthorizeId,
+    // #[error("The Authorize ID provided is invalid or does not exist on our papers")]
+    // InvalidAuthorizeId,
     #[error("We do not support that code challenge using this method")]
     UnsupportedCodeChallengeMethod,
 }
@@ -100,7 +100,7 @@ impl OauthErrorKind {
             | Self::InvalidRequest
             | Self::InvalidRedirectUri
             | Self::FailedMakingUrl
-            | Self::InvalidAuthorizeId
+            // | Self::InvalidAuthorizeId
             | Self::UnsupportedCodeChallengeMethod => "invalid_request",
         }
     }
@@ -117,7 +117,7 @@ impl OauthErrorKind {
             | Self::InvalidRequest
             | Self::InvalidRedirectUri
             | Self::FailedMakingUrl
-            | Self::InvalidAuthorizeId
+            // | Self::InvalidAuthorizeId
             | Self::FailedParsingScopes(_)
             | Self::UnsupportedCodeChallengeMethod
             | Self::InvalidGrant => axum::http::StatusCode::BAD_REQUEST, // dunno if these should be all 400

@@ -2,11 +2,12 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{
     http::{
-        HeaderValue,
+        HeaderValue, Method,
         header::{AUTHORIZATION, CONTENT_TYPE},
     },
     routing::get,
 };
+use axum_helmet::{Helmet, HelmetLayer};
 use tokio::{net::TcpSocket, sync::oneshot};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
@@ -45,7 +46,7 @@ pub const SUDO_TAG: &str = "Sudo";
 #[derive(OpenApi)]
 #[openapi(
     security(
-        ("Bearer Auth (OAuth2 Access Token)" = []),
+        // ("Bearer Auth (OAuth2 Access Token)" = []),
         ("Cookie Auth (Session JWT)" = [])
     ),
     modifiers(&WhyUtoipa),
@@ -95,7 +96,13 @@ fn routes(global: &Arc<GlobalState>) -> OpenApiRouter {
         )
         .allow_credentials(true)
         .allow_headers([CONTENT_TYPE, AUTHORIZATION])
-        .allow_credentials(true)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::PATCH,
+        ])
         .max_age(Duration::from_secs(7200)); // max age that allows chrome
 
     OpenApiRouter::with_openapi(openapi)
@@ -106,7 +113,8 @@ fn routes(global: &Arc<GlobalState>) -> OpenApiRouter {
                 .layer(cors)
                 .layer(CookieManagerLayer::new())
                 .layer(AuthManagerLayer::new(global.clone()))
-                .layer(OauthManagerLayer::new(global.clone())),
+                .layer(OauthManagerLayer::new(global.clone()))
+                .layer(HelmetLayer::new(Helmet::default())),
         )
         .with_state(global.clone())
 }

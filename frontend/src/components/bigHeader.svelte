@@ -11,22 +11,22 @@
 	// });
 	// let headerText = get(currentText);
 	let headerText = $derived($currentText); // i get it (not really)
-	let isLogged = $derived(!!$user);
+	// let isLogged = $derived(!!$user);
 
-	async function signout() {
-		await client.POST('/v1/auth/signout');
-		user.set(null); // clear it even if it fails lol
-		await goto('/');
-	}
+	// async function signout() {
+	// 	await client.POST('/v1/auth/signout');
+	// 	user.set(null); // clear it even if it fails lol
+	// 	await goto('/');
+	// }
 </script>
 
 <header>
 	<h1>{headerText}</h1>
-	<nav>
+	<!-- <nav>
 		{#if isLogged}
-			<Button onclick={() => signout()}>Log out</Button>
+			<Button onclick={() => signout()}>Sign out</Button>
 		{/if}
-	</nav>
+	</nav> -->
 </header>
 
 <style lang="scss">
@@ -68,11 +68,11 @@
 		}
 	}
 
-	nav {
-		width: 100%;
-		display: flex;
-		flex-direction: row;
-		justify-content: end;
-		align-items: center;
-	}
+	// nav {
+	// 	width: 100%;
+	// 	display: flex;
+	// 	flex-direction: row;
+	// 	justify-content: end;
+	// 	align-items: center;
+	// }
 </style>

@@ -2,14 +2,14 @@
 	import { z } from 'zod/v4'; // why?
 
 	const otpSchema = z.object({
-		email: z.email("I don't think that's a valid email!")
+		email: z.email("I don't think that's a valid email")
 	});
 
 	const passwordSchema = z.object({
 		email: z
-			.email("I don't think that's a valid email!")
-			.or(z.string().min(6, 'Your login should be at least 6 characters long')),
-		password: z.string().min(8, 'Password must be at least 8 characters long!')
+			.email("I don't think that's a valid email")
+			.or(z.string().trim().min(6, 'Your login should be at least 6 characters long')),
+		password: z.string().trim().min(8, 'Password must be at least 8 characters long')
 	});
 </script>
 
@@ -18,15 +18,16 @@
 	import Input from '../components/forms/input.svelte';
 	import { currentText } from '$lib/bigHeader';
 	import Link from '../components/link.svelte';
-	import { defaults, superForm } from 'sveltekit-superforms';
+	import { defaults, superForm, message as sMessage } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import { Control, Field } from 'formsnap';
 	import Label from '../components/forms/label.svelte';
-	import FormContainer from '../components/forms/container.svelte';
 	import FieldErrors from '../components/forms/fieldErrors.svelte';
-	import client from '$lib/api/baseFetch';
+	import client, { type ApiHttpError } from '$lib/api/baseFetch';
 	import Spinner from '../components/spinner.svelte';
 	import { goto } from '$app/navigation';
+	import FieldContainer from '../components/forms/fieldContainer.svelte';
+	import FormContainer from '../components/forms/formContainer.svelte';
 
 	currentText.set('Log in');
 	let passwordMode = $state(false);
@@ -42,6 +43,10 @@
 					}
 				});
 
+				if (res.error) {
+					sMessage(f, res.error.message);
+					otpForm.reset();
+				}
 				if (res.response.ok) {
 					let template = '/otp/{link}?email={email}';
 
@@ -65,6 +70,14 @@
 					}
 				});
 
+				if (res.error?.error === ('TOTPIsRequired' as ApiHttpError)) {
+					const template = '/totp/{link}';
+					await goto(template.replace('{link}', res.error.link_id ?? '00000000000000000000000000'));
+				} else if (res.error) {
+					sMessage(f, res.error.message);
+					otpForm.reset();
+				}
+
 				if (res.response.ok) {
 					await goto('/yay');
 				}
@@ -72,11 +85,17 @@
 		}
 	});
 
-	const { enhance: otpEnhance, form: otpFormData, delayed: otpDelayed } = otpForm;
+	const {
+		enhance: otpEnhance,
+		form: otpFormData,
+		delayed: otpDelayed,
+		message: otpMessage
+	} = otpForm;
 	const {
 		enhance: passwordEnhance,
 		form: passwordFormData,
-		delayed: passwordDelayed
+		delayed: passwordDelayed,
+		message: passwordMessage
 	} = passwordForm;
 
 	const swapMode = () => {
@@ -90,30 +109,45 @@
 <main>
 	<h1>Log in to your account</h1>
 
-	<div class="wawa"></div>
+	{#if $passwordMessage}
+		<div class="message">
+			<p>{$passwordMessage}</p>
+		</div>
+	{/if}
+
+	{#if $otpMessage}
+		<div class="message">
+			<p>{$otpMessage}</p>
+		</div>
+	{/if}
+
 	{#if !passwordMode}
 		<form class="container" use:otpEnhance>
-			<Field form={otpForm} name="email">
-				<FormContainer>
-					<Control>
-						{#snippet children({ props })}
-							<Label>Email address</Label>
-							<Input
-								{...props}
-								disabled={$otpDelayed}
-								type="text"
-								placeholder="beep@example.com"
-								big
-								autocomplete="email"
-								bind:value={$otpFormData.email}
-							/>
-						{/snippet}
-					</Control>
-					<FieldErrors />
-				</FormContainer>
-			</Field>
+			<FormContainer>
+				<Field form={otpForm} name="email">
+					<FieldContainer>
+						<Control>
+							{#snippet children({ props })}
+								<Label>Email address</Label>
+								<Input
+									{...props}
+									disabled={$otpDelayed}
+									type="email"
+									placeholder="beep@example.com"
+									big
+									autocomplete="email"
+									bind:value={$otpFormData.email}
+								/>
+							{/snippet}
+						</Control>
+						<FieldErrors />
+					</FieldContainer>
+				</Field>
+			</FormContainer>
 
-			<p>or use <Link href="/" onclick={() => swapMode()}>your password</Link></p>
+			<p>
+				or use <Link href="/" onclick={() => swapMode()} disabled={$otpDelayed}>your password</Link>
+			</p>
 
 			<Button big primary full_width type="submit" disabled={$otpDelayed} loading={$otpDelayed}>
 				{#snippet icon()}
@@ -126,50 +160,54 @@
 		</form>
 	{:else}
 		<form class="container" use:passwordEnhance>
-			<Field form={passwordForm} name="email">
-				<FormContainer>
-					<Control>
-						{#snippet children({ props })}
-							<Label>Email address</Label>
-							<Input
-								{...props}
-								disabled={$passwordDelayed}
-								type="text"
-								placeholder="beep@example.com"
-								big
-								autocomplete="email"
-								bind:value={$passwordFormData.email}
-							/>
-						{/snippet}
-					</Control>
-					<FieldErrors />
-				</FormContainer>
-			</Field>
-			<Field form={passwordForm} name="password">
-				<FormContainer>
-					<Control>
-						{#snippet children({ props })}
-							<Label>Password</Label>
-							<Input
-								{...props}
-								disabled={$passwordDelayed}
-								type="password"
-								placeholder="•••••••••••••"
-								big
-								autocomplete="off"
-								bind:value={$passwordFormData.password}
-							/>
-						{/snippet}
-					</Control>
-					<FieldErrors />
-				</FormContainer>
-			</Field>
+			<FormContainer>
+				<Field form={passwordForm} name="email">
+					<FieldContainer>
+						<Control>
+							{#snippet children({ props })}
+								<Label>Email address</Label>
+								<Input
+									{...props}
+									disabled={$passwordDelayed}
+									type="email"
+									placeholder="beep@example.com"
+									big
+									autocomplete="email"
+									bind:value={$passwordFormData.email}
+								/>
+							{/snippet}
+						</Control>
+						<FieldErrors />
+					</FieldContainer>
+				</Field>
+				<Field form={passwordForm} name="password">
+					<FieldContainer>
+						<Control>
+							{#snippet children({ props })}
+								<Label>Password</Label>
+								<Input
+									{...props}
+									disabled={$passwordDelayed}
+									type="password"
+									placeholder="•••••••••••••"
+									big
+									autocomplete="off"
+									bind:value={$passwordFormData.password}
+								/>
+							{/snippet}
+						</Control>
+						<FieldErrors />
+					</FieldContainer>
+				</Field>
+			</FormContainer>
 
 			<p>
-				or use a <Link href="/" onclick={() => swapMode()}>one-time code</Link>
+				or use a <Link href="/" onclick={() => swapMode()} disabled={$passwordDelayed}
+					>one-time code</Link
+				>
 			</p>
 			<p>
-				Don't have an account yet? <a href="/signup">Sign up</a>
+				Forgot your password? <Link href="/reset-password">Reset it here</Link>
 			</p>
 
 			<Button
@@ -192,16 +230,28 @@
 	{/if}
 	<em></em>
 	<div class="container">
-		<Button big full_width>Continue with Github</Button>
-		<Button big full_width>Continue with Google</Button>
+		<Button big full_width disabled>Continue with Github</Button>
+		<Button big full_width disabled>Continue with Google</Button>
 	</div>
 </main>
 
 <style lang="scss">
-	.wawa {
+	// copy of fieldErrors styles. should find a way to make a component
+	.message {
+		border: 1px solid var(--color-bad-darkened);
 		padding: 0.5rem;
-		
+		border-radius: 8px;
+		display: flex;
+		flex-direction: row;
+		gap: 0.5rem; // for icons
+		align-items: center;
+		p {
+			font: inherit;
+			font-size: 0.875rem;
+			color: var(--color-bad);
+		}
 	}
+
 	main {
 		padding: 2.5rem 0;
 		display: flex;
@@ -212,7 +262,7 @@
 	}
 
 	p {
-		font-size: 14px;
+		font-size: 0.875rem;
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
@@ -228,9 +278,9 @@
 	}
 
 	h1 {
-		font-size: 1.625rem;
+		font-size: 1.5rem;
 		font-weight: 600;
-		letter-spacing: var(--text-tight-spacing);
+		letter-spacing: var(--text-almost-tight-spacing);
 	}
 
 	em {

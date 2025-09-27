@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
+use argon2::{
+    Argon2, PasswordHash, PasswordHasher, PasswordVerifier as _, password_hash::SaltString,
+};
 use axum::{Extension, extract::State, http::HeaderMap};
+use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -77,62 +81,57 @@ async fn login(
 
     let flow_id = FlowId::new();
     let secret = totp_secret().to_encoded();
-
-    let flow = AuthFlow::OtpLoginRequest {
-        secret: secret.to_string(),
-    };
-    flow.store(
-        AuthFlowNamespace::OtpAuth,
-        AuthFlowKey::FlowEmail {
-            flow_id,
-            email: user.email.clone(),
-        },
-        &global.redis,
-    )
-    .await?;
-
     let code = get_totp_client(&secret).generate_current()?;
-    let email = AuthEmails::OtpLoginRequest {
-        login: user.login,
-        code: code.to_string(),
+
+    let argon2 = Argon2::default();
+    let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());
+    let secret = argon2.hash_password(code.as_bytes(), &salt)?.to_string();
+
+    AuthFlow::OtpLoginRequest { secret }
+        .store(
+            AuthFlowNamespace::OtpAuth,
+            AuthFlowKey::FlowEmail {
+                flow_id,
+                email: user.email.clone(),
+            },
+            &global.redis,
+        )
+        .await?;
+
+    let email = AuthEmails::OtpRequest {
+        identifier: user.login,
+        code,
+        is_login: true,
     };
 
     global.mailer.send(&user.email, email).await?;
     Ok(Json(AuthResponse { link_id: flow_id }))
 }
 
-#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
-pub struct RegisterPassword {
-    #[validate(email)]
-    email: String,
-    #[validate(length(min = 6))]
-    login: String,
-    #[validate(length(min = 9))]
-    password: String,
-}
-
 async fn register(global: Arc<GlobalState>, email: String) -> HttpResult<Json<AuthResponse>> {
     let flow_id = FlowId::new();
     let secret = totp_secret().to_encoded();
-
-    let flow = AuthFlow::OtpRegisterRequest {
-        secret: secret.to_string(),
-    };
-    flow.store(
-        AuthFlowNamespace::OtpAuth,
-        AuthFlowKey::FlowEmail {
-            flow_id,
-            email: email.clone(),
-        },
-        &global.redis,
-    )
-    .await?;
-
     let code = get_totp_client(&secret).generate_current()?;
 
-    let mailer_email = AuthEmails::OtpRegisterRequest {
-        email: email.clone(),
+    let argon2 = Argon2::default();
+    let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());
+    let secret = argon2.hash_password(code.as_bytes(), &salt)?.to_string();
+
+    AuthFlow::OtpRegisterRequest { secret }
+        .store(
+            AuthFlowNamespace::OtpAuth,
+            AuthFlowKey::FlowEmail {
+                flow_id,
+                email: email.clone(),
+            },
+            &global.redis,
+        )
+        .await?;
+
+    let mailer_email = AuthEmails::OtpRequest {
+        identifier: email.clone(),
         code: code.to_string(),
+        is_login: false,
     };
 
     global.mailer.send(&email, mailer_email).await?;
@@ -198,10 +197,10 @@ async fn exchange_login(
             return Err(ApiError::InvalidLogin);
         };
 
-        let totp = get_totp_client(&totp_rs::Secret::Encoded(secret.clone()));
-        if !totp.check_current(&request.code)? {
-            return Err(ApiError::InvalidOTPCode(request.code));
-        }
+        let argon2 = Argon2::default();
+        argon2
+            .verify_password(request.code.as_bytes(), &PasswordHash::new(&secret)?)
+            .map_err(|_| ApiError::InvalidOTPCode(request.code))?;
 
         AuthFlow::remove(
             AuthFlowNamespace::OtpAuth,
@@ -248,12 +247,11 @@ async fn exchange_login(
         if (User::get_by_email(&request.email, &global.database).await?).is_some() {
             return Err(ApiError::InvalidLogin);
         }
-        let login = User::get_login_by_email(&request.email, &global.database).await?;
 
-        let totp = get_totp_client(&totp_rs::Secret::Encoded(secret.clone()));
-        if !totp.check_current(&request.code)? {
-            return Err(ApiError::InvalidOTPCode(request.code));
-        }
+        let argon2 = Argon2::default();
+        argon2
+            .verify_password(request.code.as_bytes(), &PasswordHash::new(&secret)?)
+            .map_err(|_| ApiError::InvalidOTPCode(request.code))?;
 
         AuthFlow::remove(
             AuthFlowNamespace::OtpAuth,
@@ -265,6 +263,7 @@ async fn exchange_login(
         )
         .await?;
 
+        let login = User::get_login_by_email(&request.email, &global.database).await?;
         let user = User::builder()
             .login(login.clone())
             .email(request.email.clone())
@@ -322,13 +321,13 @@ async fn exchange(
         return Err(ApiError::YouAreNotLoggedIn);
     }
 
-    let Some(user) = User::get(session.user_id(), &global.database).await? else {
-        return Err(ApiError::InvalidLogin);
-    };
-
     if request.code.trim().is_empty() {
         return Err(ApiError::InvalidOTPCode(request.code));
     }
+
+    let Some(user) = User::get(session.user_id(), &global.database).await? else {
+        return Err(ApiError::InvalidLogin);
+    };
 
     let flow = AuthFlow::get(
         AuthFlowNamespace::OtpExchange,
@@ -341,10 +340,10 @@ async fn exchange(
     .await?;
 
     if let Some(AuthFlow::OtpExchange { secret }) = flow {
-        let totp = get_totp_client(&totp_rs::Secret::Encoded(secret.clone()));
-        if !totp.check_current(&request.code)? {
-            return Err(ApiError::InvalidOTPCode(request.code));
-        }
+        let argon2 = Argon2::default();
+        argon2
+            .verify_password(request.code.as_bytes(), &PasswordHash::new(&secret)?)
+            .map_err(|_| ApiError::InvalidOTPCode(request.code))?;
 
         AuthFlow::remove(
             AuthFlowNamespace::OtpExchange,

@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	import z from 'zod/v4';
 	const schema = z.object({
-		code: z.string().min(6).max(6)
+		code: z.string().length(6)
 	});
 </script>
 
@@ -118,6 +118,7 @@
 			color: var(--color-bad);
 		}
 	}
+
 	.title {
 		display: flex;
 		flex-direction: column;
@@ -125,7 +126,16 @@
 		gap: 0.5rem;
 
 		p {
-			font-size: 1.125rem;
+			font-size: 1rem;
+			font-weight: 450;
+			text-align: center;
+		}
+
+		h1 {
+			font-size: 1.5rem;
+			font-weight: 600;
+			letter-spacing: var(--text-tight-spacing);
+			text-align: center;
 		}
 	}
 
@@ -136,13 +146,6 @@
 		flex-direction: column;
 		z-index: 1;
 		gap: 1.75rem;
-	}
-
-	h1 {
-		font-size: 1.625rem;
-		font-weight: 600;
-		letter-spacing: var(--text-tight-spacing);
-		text-align: center;
 	}
 
 	form {

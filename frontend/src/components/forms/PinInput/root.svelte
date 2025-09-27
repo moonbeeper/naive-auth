@@ -74,6 +74,7 @@
 		align-items: center;
 		width: 100%;
 		gap: 0.5rem;
+		padding: 0 1rem;
 		// max-width: 504px;
 		max-width: var(--pin-max-width, 504px);
 		--border-color: var(--bg-notdark);

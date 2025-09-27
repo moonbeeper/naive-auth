@@ -3,6 +3,8 @@ use typed_builder::TypedBuilder;
 
 use crate::database::{DatabaseError, ulid::Ulid};
 
+// pub const USER_EMAIL_REGEX: LazyLock<Regex> =
+//     LazyLock::new(|| Regex::new(r"^[A-Z_a-z]\w*$").unwrap());
 pub type UserId = Ulid;
 
 #[derive(Debug, Clone, TypedBuilder)]

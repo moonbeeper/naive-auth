@@ -25,6 +25,8 @@ pub enum OauthRequirement {
     NotAllowed,
 }
 
+// TODO: create middleware to simplify using this
+// TODO: create "MixedAuthContext" that would contain either AuthContext or OauthContext. The latter would have priority
 pub fn must_oauth(scopes: OauthRequirement, oauth: &OauthContext) -> Result<bool, ApiError> {
     match scopes {
         OauthRequirement::Scoped(scopes) => match oauth {

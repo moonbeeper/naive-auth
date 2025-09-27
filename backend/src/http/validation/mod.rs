@@ -18,10 +18,12 @@ use validator::{Validate, ValidationErrors, ValidationErrorsKind};
 
 use crate::http::error::ApiError;
 
+mod form;
 mod json;
 mod path;
 mod query;
 
+pub use form::*;
 pub use json::*;
 pub use path::*;
 pub use query::*;

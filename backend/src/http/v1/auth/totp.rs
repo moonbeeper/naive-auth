@@ -93,7 +93,6 @@ async fn exchange_login(
             // println!("what");
             return Err(ApiError::InvalidLogin);
         };
-        dbg!(&user);
 
         if user.totp_secret.is_none() {
             // println!("what2");
@@ -167,7 +166,7 @@ async fn exchange_login(
     Err(ApiError::InvalidLogin)
 }
 
-/// Exchange a Link ID to finalize a TOTP request flow
+/// Exchange a Link ID to finalize a Sudo enable TOTP flow
 // TODO: this shouldn't really be focused on enabling sudo.
 #[utoipa::path(
     post,
@@ -196,12 +195,11 @@ async fn exchange(
         return Err(ApiError::InvalidLogin);
     };
 
-    if user.totp_secret.is_none() {
-        return Err(ApiError::InvalidLogin); // yup. extra check just so there's a bug in another place
-    }
+    let Some(ref totp_secret) = user.totp_secret else {
+        return Err(ApiError::TOTPIsNotEnabled);
+    };
 
     let flow_id = request.link_id;
-
     let flow = AuthFlow::get(
         AuthFlowNamespace::TotpExchange,
         AuthFlowKey::UserFlow {
@@ -212,9 +210,9 @@ async fn exchange(
     )
     .await?;
 
-    if let Some(AuthFlow::TotpExchange { secret, .. }) = flow {
+    if let Some(AuthFlow::TotpExchange { .. }) = flow {
         if TOTP_CODE_REGEX.is_match(&request.code_or_recovery) {
-            let totp = get_totp_client(&totp_rs::Secret::Encoded(secret));
+            let totp = get_totp_client(&totp_rs::Secret::Encoded(totp_secret.clone()));
 
             if !totp.check_current(&request.code_or_recovery)? {
                 return Err(ApiError::InvalidTOTPCode(request.code_or_recovery));

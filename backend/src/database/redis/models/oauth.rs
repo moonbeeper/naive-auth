@@ -13,7 +13,8 @@ pub enum OauthFlow {
         redirect_uri: String,
         state: Option<String>,
         scopes: i64,
-        code_challenge: String, // I don't know if I should be storing it like this haha
+        code_challenge: String,
+        is_upgrade: bool,
     },
     TokenRequest {
         client_id: OauthAppId,
@@ -21,6 +22,8 @@ pub enum OauthFlow {
         // code: String,
         scopes: i64,
         code_challenge: String,
+        is_upgrade: bool,
+        user_id: UserId,
     },
 }
 
@@ -42,7 +45,7 @@ impl Display for OauthFlowKey {
 }
 
 impl OauthFlow {
-    const fn duration(&self) -> chrono::Duration {
+    pub const fn duration(&self) -> chrono::Duration {
         match self {
             Self::TokenRequest { .. } | Self::AuthorizeRequest { .. } => {
                 chrono::Duration::minutes(5)

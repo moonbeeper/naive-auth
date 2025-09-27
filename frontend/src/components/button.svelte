@@ -76,11 +76,12 @@
 		color: var(--text);
 		border-radius: 0.625rem;
 		font-family: inherit;
-		transition: background-color outline 0.1s ease-out;
 		font-weight: 500;
+		text-transform: capitalize;
 		cursor: pointer;
 		height: 36px;
 		user-select: none;
+		transition: background-color 0.1s ease-out; // I don't think that the outline should be animated
 
 		display: flex;
 		align-items: center;
@@ -102,6 +103,7 @@
 
 		&[aria-disabled='true'] {
 			background-color: var(--bg-semidark);
+			cursor: not-allowed;
 		}
 
 		&.primary {
@@ -114,7 +116,6 @@
 
 			&[aria-disabled='true'] {
 				background-color: var(--white-darkened);
-				cursor: not-allowed;
 			}
 		}
 

@@ -8,17 +8,16 @@ use rand_chacha::{
 use regex::Regex;
 use simple_useragent::UserAgentParser;
 use tower_cookies::{Cookie, Cookies};
-use utoipa::ToSchema;
 
 use crate::{
-    auth::{middleware::AuthContext, oauth::middleware::OauthContext, ticket::AuthTicket},
+    auth::{middleware::AuthContext, oauth::middleware::OauthContext, ticket::SessionTicket},
     database::{
         models::{
             session::Session,
             user::{User, UserId},
         },
         redis::models::{
-            FlowId, RedisError,
+            FlowId,
             auth::{AuthFlow, AuthFlowKey, AuthFlowNamespace},
         },
     },
@@ -42,8 +41,11 @@ pub async fn remove_session(
             Session::delete(session_id, &mut tx).await?;
             tx.commit().await?;
 
-            let cookie_name = global.settings.session.cookie_name.clone();
-            cookie_jar.remove(cookie_name.into());
+            let cookie = delete_cookie(
+                global.settings.session.cookie_name.clone(),
+                global.settings.http.secure_cookies,
+            );
+            cookie_jar.add(cookie);
 
             Ok(())
         }
@@ -96,11 +98,11 @@ pub fn create_session(
         .updated_at(chrono::Utc::now())
         .build();
 
-    let ticket = AuthTicket::from(&session).generate(settings)?;
+    let ticket = SessionTicket::from(&session).generate(settings)?;
     let cookie = build_cookie(
         settings.session.cookie_name.clone(),
         settings.session.inactive_age,
-        settings.session.secure_cookies,
+        settings.http.secure_cookies,
         ticket,
     );
 
@@ -122,13 +124,14 @@ pub fn build_cookie(
         .into()
 }
 
-// todo: hack. Its a copy of the HttpError with the added link_id
-// should this even be imported by the routes? i mean like there's no other way to return it otherwise
-#[derive(Debug, serde::Serialize, ToSchema)]
-pub struct TotpResponse<'a> {
-    pub error: &'a str,
-    pub message: String,
-    pub link_id: FlowId,
+pub fn delete_cookie(cookie_name: String, secure: bool) -> Cookie<'static> {
+    Cookie::build((cookie_name, "deleted"))
+        .path("/")
+        .http_only(true)
+        .secure(secure)
+        .same_site(tower_cookies::cookie::SameSite::Lax)
+        .max_age(tower_cookies::cookie::time::Duration::seconds(0))
+        .into()
 }
 
 pub async fn create_totp_login_exchange(

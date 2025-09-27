@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
+use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{Extension, extract::State};
+use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -8,7 +10,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 use crate::{
     auth::{
         middleware::AuthContext,
-        ops::{remove_session, totp_secret},
+        ops::{get_totp_client, remove_session, totp_secret},
     },
     database::{
         models::{session::Session, user::User},
@@ -17,6 +19,7 @@ use crate::{
             auth::{AuthFlow, AuthFlowKey, AuthFlowNamespace},
         },
     },
+    email::resources::AuthEmails,
     global::GlobalState,
     http::{
         HttpResult, SUDO_TAG,
@@ -101,7 +104,12 @@ async fn enable_sudo(
     match request.option {
         SudoEnableOption::Otp => {
             let flow_id = FlowId::new();
-            let secret = totp_secret().to_encoded().to_string();
+            let secret = totp_secret().to_encoded();
+            let code = get_totp_client(&secret).generate_current()?;
+
+            let argon2 = Argon2::default();
+            let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());
+            let secret = argon2.hash_password(code.as_bytes(), &salt)?.to_string();
 
             AuthFlow::OtpExchange { secret }
                 .store(
@@ -114,6 +122,13 @@ async fn enable_sudo(
                 )
                 .await?;
 
+            let mailer_email = AuthEmails::OtpRequest {
+                identifier: user.login,
+                code: code.to_string(),
+                is_login: true,
+            };
+            global.mailer.send(&user.email, mailer_email).await?;
+
             Ok(Json(SudoEnableResponse {
                 option: request.option,
                 link_id: flow_id,
@@ -121,11 +136,10 @@ async fn enable_sudo(
         }
         SudoEnableOption::Totp => {
             let flow_id = FlowId::new();
-            let secret = totp_secret().to_encoded().to_string();
 
             AuthFlow::TotpExchange {
-                user_id: user.id,
-                secret,
+                user_id: FlowId::nil(),
+                secret: "deleted".to_string(),
             }
             .store(
                 AuthFlowNamespace::OtpExchange,

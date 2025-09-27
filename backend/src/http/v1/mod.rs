@@ -2,9 +2,8 @@
 
 use std::sync::Arc;
 
-use axum::{Extension, extract::State, response::IntoResponse};
+use axum::{Extension, extract::State};
 use tower_cookies::Cookies;
-use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::{
@@ -96,25 +95,26 @@ async fn funny() -> HttpResult<()> {
     Err(ApiError::Teapot)
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
-#[serde(untagged)]
-pub enum JsonEither<L, R> {
-    Left(L),
-    Right(R),
-}
+// No longer necessary because of correct use of http errors
+// #[derive(Debug, serde::Serialize, serde::Deserialize, ToSchema)]
+// #[serde(untagged)]
+// pub enum JsonEither<L, R> {
+//     Left(L),
+//     Right(R),
+// }
 
-impl<L, R> IntoResponse for JsonEither<L, R>
-where
-    L: serde::Serialize,
-    R: serde::Serialize,
-{
-    fn into_response(self) -> axum::response::Response {
-        match self {
-            Self::Left(l) => Json(l).into_response(),
-            Self::Right(r) => Json(r).into_response(),
-        }
-    }
-}
+// impl<L, R> IntoResponse for JsonEither<L, R>
+// where
+//     L: serde::Serialize,
+//     R: serde::Serialize,
+// {
+//     fn into_response(self) -> axum::response::Response {
+//         match self {
+//             Self::Left(l) => Json(l).into_response(),
+//             Self::Right(r) => Json(r).into_response(),
+//         }
+//     }
+// }
 
 // todo: this really shouldn't be here
 pub fn string_trim<'de, D>(d: D) -> Result<String, D::Error>

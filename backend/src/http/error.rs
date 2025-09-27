@@ -61,7 +61,7 @@ pub enum ApiError {
     InvalidRecoveryCode(String),
     #[error("You already used this recovery code: {0}")]
     UsedRecoveryCode(String),
-    #[error("You need to enable 2FA first before you can disable it")]
+    #[error("You need to enable 2FA first before you can do this action")]
     TOTPIsNotEnabled,
     #[error("Seems like the OTP recovery flow has expired or is invalid. Please retry again")]
     OTPRecoveryFlowNotFound,
@@ -127,6 +127,20 @@ pub enum ApiError {
     MissingPathParams,
     #[error("The query parameters couldn't be deserialized because of: {0}")]
     FailedToDeserializeQuery(String),
+    #[error("The verification has expired. You can request a new one")]
+    EmailVerificationExpired,
+    #[error(
+        "Oh snap! The new password seems to be the same as the old one. Maybe try a different one?"
+    )]
+    PasswordMatchesOld,
+    #[error("The OAuth authorization flow was not found. Try again?")]
+    OauthFlowNotFound,
+    #[error("The form couldn't be deserialized because of: {0}")]
+    FailedToDeserializeForm(String),
+    #[error("The form body couldn't be deserialized because of: {0}")]
+    FailedToDeserializeFormBody(String),
+    #[error("Form requests must have `Content-Type: application/x-www-form-urlencoded`")]
+    MissingFormContentType,
 }
 
 // todo: go through all errors and make sure they have proper status codes
@@ -182,6 +196,12 @@ impl ApiError {
             Self::FailedToDeserializePathParams(_) => StatusCode::BAD_REQUEST,
             Self::MissingPathParams => StatusCode::INTERNAL_SERVER_ERROR,
             Self::FailedToDeserializeQuery(_) => StatusCode::BAD_REQUEST,
+            Self::EmailVerificationExpired => StatusCode::BAD_REQUEST, // todo: give error code
+            Self::PasswordMatchesOld => StatusCode::CONFLICT,
+            Self::OauthFlowNotFound => StatusCode::NOT_FOUND,
+            Self::FailedToDeserializeForm(_) => StatusCode::BAD_REQUEST,
+            Self::FailedToDeserializeFormBody(_) => StatusCode::BAD_REQUEST,
+            Self::MissingFormContentType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
         }
     }
 }

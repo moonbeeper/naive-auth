@@ -151,4 +151,21 @@ impl OauthAuthorized {
 
         Ok(())
     }
+
+    // always returns Ok even if the requested session does not exist
+    pub async fn delete_by_app_and_user(
+        app: OauthAppId,
+        user_id: UserId,
+        transaction: &mut PgTransaction<'_>,
+    ) -> DatabaseError<()> {
+        sqlx::query!(
+            "delete from oauth_authorizations where app = $1 and user_id = $2",
+            app as OauthAppId,
+            user_id as UserId
+        )
+        .execute(&mut **transaction)
+        .await?;
+
+        Ok(())
+    }
 }

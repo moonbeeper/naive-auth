@@ -8,15 +8,15 @@ use crate::database::{
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AuthFlow {
     OtpLoginRequest {
+        /// This is the code hashed with argon2
         secret: String,
     },
     OtpRegisterRequest {
+        /// This is the code hashed with argon2
         secret: String,
     },
-    OtpRecoverRequest {
-        code: String,
-    },
     OtpExchange {
+        /// This is the code hashed with argon2
         secret: String,
     },
     TotpExchange {
@@ -30,9 +30,9 @@ pub enum AuthFlow {
         secret: String,
         recovery_secret: String,
     },
-    VerifyEmail {
-        code: String,
-    },
+    // VerifyEmail {
+    //     code: String,
+    // },
     PasswordReset {
         user_id: UserId,
         has_totp: bool,
@@ -47,7 +47,7 @@ pub enum AuthFlowNamespace {
     TotpEnable,
     TotpExchange,
     TotpLoginExchange,
-    VerifyEmail,
+    // VerifyEmail,
     PasswordReset,
 }
 
@@ -60,7 +60,7 @@ impl AuthFlowNamespace {
             Self::TotpEnable => "totp:enable",
             Self::TotpExchange => "totp:exchange",
             Self::TotpLoginExchange => "totp:login:exchange",
-            Self::VerifyEmail => "verify:email",
+            // Self::VerifyEmail => "verify:email",
             Self::PasswordReset => "password:reset",
         }
     }
@@ -72,6 +72,7 @@ pub enum AuthFlowKey {
     FlowId(FlowId),
     UserFlow { flow_id: FlowId, user_id: UserId },
     UserId(UserId),
+    // StringId(StringId),
 }
 
 impl Display for AuthFlowKey {
@@ -82,7 +83,7 @@ impl Display for AuthFlowKey {
             Self::UserId(user_id) => write!(f, "{user_id}"), // Self::TotpUsed { user_id } => write!(f, "{user_id}"),
             Self::UserFlow { flow_id, user_id } => {
                 write!(f, "{user_id}:{flow_id}")
-            }
+            } // Self::StringId(id) => write!(f, "{id}"),
         }
     }
 }
@@ -93,10 +94,9 @@ impl AuthFlow {
             Self::OtpRegisterRequest { .. }
             | Self::OtpLoginRequest { .. }
             | Self::OtpExchange { .. }
-            | Self::TotpExchange { .. }
-            | Self::OtpRecoverRequest { .. } => chrono::Duration::minutes(5),
+            | Self::TotpExchange { .. } => chrono::Duration::minutes(5),
             Self::TotpEnableRequest { .. } => chrono::Duration::minutes(10),
-            Self::VerifyEmail { .. } | Self::PasswordReset { .. } => chrono::Duration::minutes(30),
+            Self::PasswordReset { .. } => chrono::Duration::minutes(30),
         }
     }
 
