@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select * from oauth_applications where id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "key",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "scopes",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "callback_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "40c2dadbd9f29269aeba00c0dcf340da32ea33d82c6a119ec864af2d5ac71712"
+}

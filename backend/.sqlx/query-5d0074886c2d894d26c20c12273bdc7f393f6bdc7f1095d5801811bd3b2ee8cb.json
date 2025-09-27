@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update sessions set sudo_enabled_at = $1, updated_at = now() where id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5d0074886c2d894d26c20c12273bdc7f393f6bdc7f1095d5801811bd3b2ee8cb"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            insert into\n                users (\n                    id,\n                    login,\n                    display_name,\n                    email,\n                    email_verified,\n                    password_hash,\n                    totp_secret,\n                    totp_recovery_secret,\n                    totp_recovery_codes,\n                    updated_at,\n                    created_at\n                )\n            values ($1, LOWER($2), $3, $4, $5, $6, $7, $8, $9, now(), now())\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6694ba76f3992eb607d6e4db71f109ac3d5d63151d6eee70b7cf5127ba422ccf"
+}

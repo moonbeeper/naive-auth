@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update oauth_applications\n                set\n                    name = $1,\n                    description = $2,\n                    key = $3,\n                    callback_url = $4,\n                    scopes = $5,\n                    updated_at = now()\n            where id = $6\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Text",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9d8b0afc147e87a16937836ece25e6dec8a054a8e1c4ebbecbc62aec5de9c9de"
+}

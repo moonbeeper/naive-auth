@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            update sessions\n                set\n                    user_id = $1,\n                    name = $2,\n                    active_expires_at = $3,\n                    inactive_expires_at = $4,\n                    os = $5,\n                    browser = $6,\n                    sudo_enabled_at = $7,\n                    updated_at = now()\n            where id = $8\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1cf085b499fbbe80abb4ea5a92f7b3c1c366fe501eab4b655d39313fe9febc92"
+}

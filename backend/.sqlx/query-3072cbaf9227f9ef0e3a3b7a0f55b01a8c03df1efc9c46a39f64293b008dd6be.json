@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "delete from oauth_authorizations where app = $1 and user_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3072cbaf9227f9ef0e3a3b7a0f55b01a8c03df1efc9c46a39f64293b008dd6be"
+}
