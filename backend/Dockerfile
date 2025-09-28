@@ -20,5 +20,5 @@ LABEL org.opencontainers.image.licenses=AGPL-3.0-only
 # USER 1000 ; sadly it needs to be root to be able to log in into the public postgres instance of nest. or am doing
 # something really really reallllly wrong here... i should probably ask for help but meh. it works for now
 
-ENTRYPOINT [ "dumb-init", '--' ]
+ENTRYPOINT [ "dumb-init", "--" ]
 CMD [ "/app/server" ]

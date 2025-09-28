@@ -1,4 +1,9 @@
-use std::{fs::File, io::Write, net::SocketAddr, path::Path};
+use std::{
+    fs::File,
+    io::Write,
+    net::{SocketAddr, ToSocketAddrs},
+    path::Path,
+};
 
 use smart_default::SmartDefault;
 
@@ -76,10 +81,20 @@ pub struct RedisSettings {
     pub username: Option<String>,
     pub password: Option<String>,
     pub database: Option<u8>,
-    #[default(SocketAddr::from(([127, 0, 0, 1], 6379)))]
-    pub server: SocketAddr,
+    // #[default(SocketAddr::from(([127, 0, 0, 1], 6379)))]
+    #[default("127.0.0.1:6379")] // Workaround for using a server like "valkey:6379"
+    pub server: String,
     #[default(16)]
     pub max_connections: usize,
+}
+
+impl RedisSettings {
+    pub fn socket(&self) -> anyhow::Result<SocketAddr> {
+        self.server
+            .to_socket_addrs()?
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Failed to resolve your redis server address!"))
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, SmartDefault)]

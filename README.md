@@ -10,7 +10,7 @@ Its my try to make an authentication server that is possibly (un)secure. You can
 
 ### Backend
 
-To run it in development you'll need to first spin up the database, Redis and Mailpit. You can do this with docker compose:
+To run it in development you'll need to first spin up the database, Redis and Mailpit. You can do this with docker compose (the files are in the `docker` folder):
 
 > Mailpit is the email SMTP server that we'll be using in development. You can access it at `http://localhost:8025/`
 
@@ -106,6 +106,9 @@ SQLX_OFFLINE=true cargo build --profile dist
 > upload it to the repo!! Also, it isn't really needed for testing in development, but it's a nice thing to have.
 
 And that's it! The typical Rust build output will be in `target/dist/beepauth`.
+
+Now, if you want to get a docker image for the server, you can do so by still being inside the `backend` folder and then running
+`docker build --tag coolest-beepauth-server-image:ever .`. Then you can do whatever you want with it.
 
 ## License
 

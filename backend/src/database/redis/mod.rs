@@ -33,7 +33,7 @@ impl RedisDatabase {
 
         let redis_config = Config {
             server: ServerConfig::Centralized {
-                server: Socket::from(&settings.server).into(),
+                server: Socket::from(&settings.socket()?).into(),
             },
             database: settings.database,
             password: settings.password.clone(),

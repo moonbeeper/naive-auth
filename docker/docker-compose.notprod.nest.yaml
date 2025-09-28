@@ -1,0 +1,29 @@
+# this is nowhere near production ready AND only for nest. not tested elsewhere
+services:
+  server:
+    image: ghcr.io/moonbeeper/beepauth-server:nightly
+    restart: unless-stopped
+    depends_on:
+      - valkey
+    volumes:
+      - ./settings.toml:/app/settings.toml:ro
+      - /var/run/postgresql:/var/run/postgresql # unix socket
+    ports:
+      - ${AVAILABLE_PORT:-8080}:8080
+
+  valkey:
+    image: valkey/valkey:8.1-alpine
+    restart: unless-stopped
+    # command: valkey-server --requirepass $VALKEY_PASSWORD
+    entrypoint: /valkey.entrypoint.sh
+    env_file:
+      - .env.valkey
+    volumes:
+      - 'valkey-data:/data'
+      - './notprod.valkey.conf:/valkey.conf'
+      - './notprod.valkey.entrypoint.sh:/valkey.entrypoint.sh'
+  # the frontend will be directly built on nest and served by caddy
+volumes:
+  db-data:
+  valkey-data:
+
