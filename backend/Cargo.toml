@@ -4,6 +4,8 @@ description = "naively made authentication server"
 authors = ["moonbeeper <moonbeeper@duck.com>"]
 version = "0.1.0"
 edition = "2024"
+license = "AGPL-3.0-only"
+
 
 [dependencies]
 beepauth_macros = { path = "macros" }

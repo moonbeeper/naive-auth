@@ -141,7 +141,9 @@ impl Settings {
                 Ok(settings)
             }
             Err(e) => {
-                println!("Failed to deserialize settings! Will be using the defaults: {e:?}");
+                println!(
+                    "Failed to deserialize settings from settings file! Will be using the defaults: {e:?}"
+                );
                 Ok(Self::default())
             }
         }
