@@ -46,9 +46,7 @@ impl EmailMan {
                 if let Some(tls_type) = &settings.smtp.tls_type {
                     match tls_type {
                         EmailServerTls::StartTls => {
-                            tracing::info!(
-                                "Using TLS with STARTTLS security."
-                            );
+                            tracing::info!("Using TLS with STARTTLS security.");
                             Tls::Required(
                                 TlsParametersBuilder::new(settings.smtp.host.clone())
                                     .build()
@@ -56,9 +54,7 @@ impl EmailMan {
                             )
                         }
                         EmailServerTls::Tls => {
-                            tracing::info!(
-                                "Using TLS security."
-                            );
+                            tracing::info!("Using TLS security.");
                             Tls::Wrapper(
                                 TlsParametersBuilder::new(settings.smtp.host.clone())
                                     .build()

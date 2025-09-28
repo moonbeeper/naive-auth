@@ -3,12 +3,29 @@ use tera::{Context, Tera};
 
 use crate::auth::ops::DeviceMetadata;
 
-static TERA: LazyLock<Tera> = LazyLock::new(|| match Tera::new("src/email/html/**/*.html") {
-    Ok(t) => t,
-    Err(e) => {
-        println!("Parsing error(s): {e}");
-        ::std::process::exit(1);
+#[derive(Debug, rust_embed::Embed)]
+#[folder = "src/email/html/"]
+#[include = "*.html"]
+struct Templates;
+
+pub static TERA: LazyLock<Tera> = LazyLock::new(|| {
+    let mut tera = Tera::default();
+    for filename in Templates::iter() {
+        if let Some(file) = Templates::get(&filename) {
+            let data =
+                std::str::from_utf8(file.data.as_ref()).expect("valid utf-8 on html templates");
+            // println!("aaa :{filename}");
+            match tera.add_raw_template(&filename, data.into()) {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("Template parsing error(s): {e}");
+                    ::std::process::exit(1);
+                }
+            }
+        }
     }
+    tera
+    // match Tera::new("src/email/html/**/*.html") {}
 });
 
 pub trait EmailResource {
