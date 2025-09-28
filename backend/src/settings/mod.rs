@@ -74,6 +74,14 @@ pub struct EmailServer {
     pub port: u16,
     #[default(false)]
     pub tls: bool,
+    pub tls_type: Option<EmailServerTls>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, std::fmt::Debug, Default)]
+pub enum EmailServerTls {
+    #[default]
+    StartTls,
+    Tls,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, SmartDefault)]

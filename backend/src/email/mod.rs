@@ -9,7 +9,7 @@ use lettre::{
     },
 };
 
-use crate::settings::EmailSettings;
+use crate::settings::{EmailServerTls, EmailSettings};
 
 pub mod resources;
 
@@ -43,11 +43,37 @@ impl EmailMan {
             .credentials(credentials)
             .port(settings.smtp.port)
             .tls(if settings.smtp.tls {
-                Tls::Wrapper(
-                    TlsParametersBuilder::new(settings.smtp.host.clone())
-                        .build()
-                        .expect("Failed to build TLS params"),
-                )
+                if let Some(tls_type) = &settings.smtp.tls_type {
+                    match tls_type {
+                        EmailServerTls::StartTls => {
+                            tracing::info!(
+                                "Using TLS with STARTTLS security."
+                            );
+                            Tls::Required(
+                                TlsParametersBuilder::new(settings.smtp.host.clone())
+                                    .build()
+                                    .expect("Failed to build TLS params"),
+                            )
+                        }
+                        EmailServerTls::Tls => {
+                            tracing::info!(
+                                "Using TLS security."
+                            );
+                            Tls::Wrapper(
+                                TlsParametersBuilder::new(settings.smtp.host.clone())
+                                    .build()
+                                    .expect("Failed to build TLS params"),
+                            )
+                        }
+                    }
+                } else {
+                    tracing::info!("TLS was enabled but no TLS type was specified. Using TLS");
+                    Tls::Wrapper(
+                        TlsParametersBuilder::new(settings.smtp.host.clone())
+                            .build()
+                            .expect("Failed to build TLS params"),
+                    )
+                }
             } else {
                 Tls::None
             })
