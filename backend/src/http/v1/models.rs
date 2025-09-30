@@ -133,6 +133,7 @@ pub struct TinySession {
     pub name: String,
     pub active_expires_at: chrono::DateTime<chrono::Utc>,
     pub os: String,
+    pub current: bool,
 }
 
 impl From<database::models::session::Session> for TinySession {
@@ -142,6 +143,7 @@ impl From<database::models::session::Session> for TinySession {
             name: value.name,
             active_expires_at: value.active_expires_at,
             os: value.os,
+            current: false,
         }
     }
 }

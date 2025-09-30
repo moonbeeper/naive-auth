@@ -141,6 +141,8 @@ pub enum ApiError {
     FailedToDeserializeFormBody(String),
     #[error("Form requests must have `Content-Type: application/x-www-form-urlencoded`")]
     MissingFormContentType,
+    #[error("The old password you provided is not correct")]
+    InvalidOldPassword,
 }
 
 // todo: go through all errors and make sure they have proper status codes
@@ -202,6 +204,7 @@ impl ApiError {
             Self::FailedToDeserializeForm(_) => StatusCode::BAD_REQUEST,
             Self::FailedToDeserializeFormBody(_) => StatusCode::BAD_REQUEST,
             Self::MissingFormContentType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            Self::InvalidOldPassword => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -211,11 +214,11 @@ impl IntoResponse for ApiError {
         let status = self.status_code();
         tracing::error!("HTTP Error was thrown: {:?}", self);
 
-        let mut link_id = None;
-
-        if let Self::TOTPIsRequired(ref id) = self {
-            link_id = Some(id.to_string());
-        }
+        let link_id = if let Self::TOTPIsRequired(ref id) = self {
+            Some(id.to_string())
+        } else {
+            None
+        };
 
         let error = HttpError {
             message: self.to_string(),

@@ -30,9 +30,12 @@ export const load: PageLoad = async ({ params, fetch }) => {
 
 		// TODO: should make a +error.svelte page here
 		if (res.error?.error === ('RecoveryLinkNotFound' as ApiHttpError)) {
-			error(400, 'Invalid password reset link');
+			error(400, 'Seems like your reset link is invalid. Please try again.');
 		} else if (res.error) {
-			error(500, 'An unknown error occurred');
+			error(
+				500,
+				'An unexpected error occurred while validating your reset link. Please try again.'
+			);
 		}
 
 		if (res.data.status == 'needs_totp') {

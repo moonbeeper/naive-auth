@@ -1,32 +1,19 @@
 <script lang="ts">
-	import Button from './button.svelte';
 	import { currentText } from '$lib/bigHeader';
-	import { user } from '$lib/auth';
-	import client from '$lib/api/baseFetch';
-	import { goto } from '$app/navigation';
+	import { PanelRight } from '@lucide/svelte';
+	import Button from './button.svelte';
 
-	// let headerText = $state('???');
-	// currentText.subscribe((text) => {
-	// 	headerText = text;
-	// });
-	// let headerText = get(currentText);
 	let headerText = $derived($currentText); // i get it (not really)
-	// let isLogged = $derived(!!$user);
-
-	// async function signout() {
-	// 	await client.POST('/v1/auth/signout');
-	// 	user.set(null); // clear it even if it fails lol
-	// 	await goto('/');
-	// }
 </script>
 
 <header>
+	<!-- <Button>
+		{#snippet icon()}
+			<PanelRight size="20" />
+		{/snippet}
+	</Button>
+	<span class="separator"></span> -->
 	<h1>{headerText}</h1>
-	<!-- <nav>
-		{#if isLogged}
-			<Button onclick={() => signout()}>Sign out</Button>
-		{/if}
-	</nav> -->
 </header>
 
 <style lang="scss">
@@ -36,35 +23,50 @@
 		min-height: 80px;
 		height: 80px;
 		align-items: center;
+		z-index: 50;
 		--title-spacing: 0em;
+		gap: 1rem;
 	}
 
-	// 18 20 24       32 40 48
-	// magic number land
+	.separator {
+		background-color: var(--bg-notdark); // looks better lol
+		width: 1px;
+		height: 80%;
+	}
+
 	h1 {
 		flex: 1 0 auto; // woops, seems this makes it have the correct bounding box in the devtools
 		font-weight: 700;
-		font-size: clamp(1.125rem, 0.9rem + 1.2vw, 2rem);
+		font-size: 24px;
 		letter-spacing: var(--title-spacing);
 		white-space: nowrap;
 		min-width: 0;
 	}
 
-	@media (min-width: 544px) {
+	@media (min-width: 640px) {
 		header {
 			--title-spacing: var(--text-almost-tight-spacing);
 		}
 		h1 {
-			font-size: clamp(1.25rem, 1rem + 1.4vw, 2.5rem);
+			font-size: 32px;
 		}
 	}
 
 	@media (min-width: 768px) {
 		header {
+			--title-spacing: var(--text-almost-tight-spacing);
+		}
+		h1 {
+			font-size: 40px;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		header {
 			--title-spacing: var(--text-tight-spacing);
 		}
 		h1 {
-			font-size: clamp(1.5rem, 1.1rem + 1.8vw, 3rem);
+			font-size: 48px;
 		}
 	}
 

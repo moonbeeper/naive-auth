@@ -36,6 +36,6 @@ export function redirectIfNotAuthenticated() {
 
 export function redirectIfAuthenticated() {
 	if (browser && get(user)) {
-		redirect(303, '/yay');
+		redirect(303, '/settings');
 	}
 }

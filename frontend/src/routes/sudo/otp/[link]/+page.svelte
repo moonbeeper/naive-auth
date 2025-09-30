@@ -19,14 +19,14 @@
 
 	let { data }: PageProps = $props();
 
-	currentText.set('OTP Login');
+	currentText.set('OTP Sudo');
 
 	const codeForm = superForm(defaults(zod4(schema)), {
 		validators: zod4(schema),
 		SPA: true,
 		onUpdate: async ({ form: f }) => {
 			if (f.valid) {
-				const res = await client.POST('/v1/auth/otp/exchange-login', {
+				const res = await client.POST('/v1/auth/otp/exchange', {
 					body: {
 						code: f.data.code,
 						link_id: data.link,
@@ -38,9 +38,6 @@
 					// todo: Find a way to make this add the data-fs-error attribute to the input (?)
 					sMessage(f, res.error.message);
 					codeForm.reset();
-				} else if (res.error?.error === ('TOTPIsRequired' as ApiHttpError)) {
-					const template = '/totp/{link}';
-					await goto(template.replace('{link}', res.error.link_id ?? '00000000000000000000000000'));
 				} else if (res.error) {
 					await goto('/'); // redirect with flash? idk
 				}

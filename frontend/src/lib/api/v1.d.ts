@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/v1/auth/change_password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login via user login or email and password
+         * @description Simple login with password. If the user has TOTP enabled, you'll get a TOTP challenge instead of a session.
+         */
+        post: operations["password_change"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/login": {
         parameters: {
             query?: never;
@@ -582,7 +602,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        ApiHttpError: "Database" | "InvalidLogin" | "PasswordHashing" | "UserAlreadyExists" | "Unknown" | "UnknownAlt" | "EmailError" | "RedisError" | "SystemTimeError" | "InvalidOTPCode" | "InvalidTOTPCode" | "TOTPIsRequired" | "Teapot" | "TOTPIsAlreadyEnabled" | "YouAreNotLoggedIn" | "InvalidRecoveryCode" | "UsedRecoveryCode" | "TOTPIsNotEnabled" | "OTPRecoveryFlowNotFound" | "TOTPFlowNotFound" | "EmailIsNotVerified" | "EmailIsAlreadyVerified" | "InvalidEmailVerification" | "InvalidAuthentication" | "FailedParsingScopes" | "OAuthAppNotFound" | "OAuthAppNotOwned" | "OAuthAppEmptyScopes" | "OAuthAuthorizationNotFound" | "SudoIsNotEnabled" | "SudoIsAlreadyEnabled" | "SudoCannotBeEnabled" | "TOTPExchangeNotFound" | "OTPExchangeNotFound" | "SessionDoesNotExist" | "FailedParsingURL" | "OAuthInvalidUri" | "PasswordDoesNotMatch" | "PasswordLowStrength" | "RecoveryLinkNotFound" | "ValidationError" | "JsonSyntaxError" | "JsonDataError" | "MissingJsonContentType" | "FailedToBufferContent" | "FailedToDeserializePathParams" | "MissingPathParams" | "FailedToDeserializeQuery" | "EmailVerificationExpired" | "PasswordMatchesOld" | "OauthFlowNotFound" | "FailedToDeserializeForm" | "FailedToDeserializeFormBody" | "MissingFormContentType";
+        ApiHttpError: "Database" | "InvalidLogin" | "PasswordHashing" | "UserAlreadyExists" | "Unknown" | "UnknownAlt" | "EmailError" | "RedisError" | "SystemTimeError" | "InvalidOTPCode" | "InvalidTOTPCode" | "TOTPIsRequired" | "Teapot" | "TOTPIsAlreadyEnabled" | "YouAreNotLoggedIn" | "InvalidRecoveryCode" | "UsedRecoveryCode" | "TOTPIsNotEnabled" | "OTPRecoveryFlowNotFound" | "TOTPFlowNotFound" | "EmailIsNotVerified" | "EmailIsAlreadyVerified" | "InvalidEmailVerification" | "InvalidAuthentication" | "FailedParsingScopes" | "OAuthAppNotFound" | "OAuthAppNotOwned" | "OAuthAppEmptyScopes" | "OAuthAuthorizationNotFound" | "SudoIsNotEnabled" | "SudoIsAlreadyEnabled" | "SudoCannotBeEnabled" | "TOTPExchangeNotFound" | "OTPExchangeNotFound" | "SessionDoesNotExist" | "FailedParsingURL" | "OAuthInvalidUri" | "PasswordDoesNotMatch" | "PasswordLowStrength" | "RecoveryLinkNotFound" | "ValidationError" | "JsonSyntaxError" | "JsonDataError" | "MissingJsonContentType" | "FailedToBufferContent" | "FailedToDeserializePathParams" | "MissingPathParams" | "FailedToDeserializeQuery" | "EmailVerificationExpired" | "PasswordMatchesOld" | "OauthFlowNotFound" | "FailedToDeserializeForm" | "FailedToDeserializeFormBody" | "MissingFormContentType" | "InvalidOldPassword";
         AuthExchange: {
             /** @description The code that was sent to the email address */
             code: string;
@@ -706,6 +726,10 @@ export interface components {
         };
         /** @enum {string} */
         OauthResponseType: "code" | "token" | "token code" | "code token";
+        PasswordChange: {
+            new_password: string;
+            old_password: string;
+        };
         ResetPassword: {
             email: string;
         };
@@ -753,6 +777,7 @@ export interface components {
         TinySession: {
             /** Format: date-time */
             active_expires_at: string;
+            current: boolean;
             id: components["schemas"]["Ulid"];
             name: string;
             os: string;
@@ -804,6 +829,55 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    password_change: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChange"];
+            };
+        };
+        responses: {
+            /** @description Successfully changed the password */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid password input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HttpError"];
+                };
+            };
+            /** @description Not authenticated or Sudo is not enabled */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HttpError"];
+                };
+            };
+            /** @description The old password provided is the same as the new one */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HttpError"];
+                };
+            };
+        };
+    };
     authPasswordLogin: {
         parameters: {
             query?: never;
@@ -2072,7 +2146,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Session"][];
+                    "application/json": components["schemas"]["TinySession"][];
                 };
             };
             /** @description Not authenticated */

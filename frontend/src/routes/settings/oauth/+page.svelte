@@ -1,13 +1,12 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import Button from '$comps/button.svelte';
 	import Link from '$comps/link.svelte';
 	import { PUBLIC_API_URL } from '$env/static/public';
 	import client from '$lib/api/baseFetch';
 	import { user } from '$lib/auth';
 	import { currentText } from '$lib/bigHeader';
-	import Button from '../../components/button.svelte';
 
-	currentText.set('yippie');
 	let api_explorer = $derived(PUBLIC_API_URL + 'scalar');
 
 	async function signout() {

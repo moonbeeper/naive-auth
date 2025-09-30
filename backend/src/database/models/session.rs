@@ -132,6 +132,21 @@ impl Session {
         Ok(())
     }
 
+    pub async fn delete_all_by_user_but_not_id(
+        id: UserId,
+        session_id: SessionId,
+        transaction: &mut PgTransaction<'_>,
+    ) -> DatabaseError<()> {
+        sqlx::query!(
+            "delete from sessions where user_id = $1 and id != $2",
+            id as UserId,
+            session_id as SessionId
+        )
+        .execute(&mut **transaction)
+        .await?;
+
+        Ok(())
+    }
     pub async fn list_user_sessions<'a, E>(id: UserId, executor: E) -> DatabaseError<Vec<Self>>
     where
         E: PgExecutor<'a>,
@@ -190,6 +205,7 @@ impl Session {
     }
 
     pub fn is_sudo_enabled(&self) -> bool {
+        println!("Sudo enabled at: {:?}", self.sudo_enabled_at);
         let Some(sudo_enabled_at) = self.sudo_enabled_at else {
             return false;
         };

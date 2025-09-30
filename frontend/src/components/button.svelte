@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { text } from '@sveltejs/kit';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from 'svelte/elements';
 
@@ -14,6 +15,8 @@
 		bad,
 		full_width,
 		icon,
+		text_left,
+		ghost,
 		...rest
 	}: HTMLButtonAttributes &
 		HTMLAnchorAttributes & {
@@ -27,6 +30,8 @@
 			full_width?: boolean;
 			loading?: boolean;
 			bad?: boolean;
+			text_left?: boolean;
+			ghost?: boolean;
 			icon?: Snippet;
 		} = $props();
 </script>
@@ -43,6 +48,9 @@
 		class:full_width
 		class:loading
 		class:bad
+		class:text_left
+		class:ghost
+		class:icon_only={!children && icon}
 	>
 		{@render icon?.()}
 		{@render children?.()}
@@ -58,7 +66,10 @@
 		class:full_width
 		class:loading
 		class:bad
+		class:text_left
+		class:ghost
 		aria-disabled={disabled}
+		class:icon_only={!children && icon}
 	>
 		{@render icon?.()}
 		{@render children?.()}
@@ -82,6 +93,7 @@
 		height: 36px;
 		user-select: none;
 		transition: background-color 0.1s ease-out; // I don't think that the outline should be animated
+		width: fit-content;
 
 		display: flex;
 		align-items: center;
@@ -136,5 +148,22 @@
 			outline: 2px solid var(--color-yellow);
 			outline-offset: 2px;
 		}
+		&.icon_only {
+			width: 36px;
+			padding: 0;
+		}
+
+		&.text_left {
+			justify-content: flex-start;
+		}
+
+		&.ghost {
+			background-color: transparent;
+			border: none;
+		}
+	}
+
+	a {
+		text-decoration: none;
 	}
 </style>

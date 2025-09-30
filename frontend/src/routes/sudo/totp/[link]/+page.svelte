@@ -22,7 +22,7 @@
 	import { slide } from 'svelte/transition';
 
 	let { data }: PageProps = $props();
-	currentText.set('2FA Login');
+	currentText.set('2FA Sudo');
 
 	let recoveryMode = $state(false);
 
@@ -31,7 +31,7 @@
 		SPA: true,
 		onUpdate: async ({ form: f }) => {
 			if (f.valid) {
-				const res = await client.POST('/v1/auth/totp/exchange-login', {
+				const res = await client.POST('/v1/auth/totp/exchange', {
 					body: {
 						code_or_recovery: f.data.code,
 						link_id: data.link
@@ -59,7 +59,7 @@
 		onUpdate: async ({ form: f }) => {
 			if (f.valid) {
 				const recovery = f.data.recovery.slice(0, 5) + '-' + f.data.recovery.slice(5, 10);
-				const res = await client.POST('/v1/auth/totp/exchange-login', {
+				const res = await client.POST('/v1/auth/totp/exchange', {
 					body: {
 						code_or_recovery: recovery,
 						link_id: data.link

@@ -59,7 +59,7 @@ async fn current_session(
     get,
     path = "/list",
     responses(
-        (status = 200, description = "A list of the your open sessions", body = Vec<models::Session>),
+        (status = 200, description = "A list of the your open sessions", body = Vec<models::TinySession>),
         (status = 401, description = "Not authenticated", body = ApiHttpError),
     ),
     tag = SESSION_TAG
@@ -81,6 +81,10 @@ async fn list_sessions(
     let sessions: Vec<models::TinySession> = sessions
         .into_iter()
         .map(models::TinySession::from)
+        .map(|mut s| {
+            s.current = s.id == auth_context.session_id();
+            s
+        })
         .collect();
 
     Ok(Json(sessions))

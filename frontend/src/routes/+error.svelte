@@ -2,20 +2,22 @@
 	// TODO: Make a proper error page
 	import { page } from '$app/state';
 	import { currentText } from '$lib/bigHeader';
+
 	currentText.set('Oh snap!');
 
 	let message = $derived(page.error?.message ?? 'An unexpected error occurred.');
+	let status = $derived(page.status ?? 500);
 </script>
 
 <main>
-	<h1>Something went wrong.</h1>
+	<h1>{status} Error.</h1>
 
 	<h2>{message}</h2>
 </main>
 
 <style lang="scss">
 	main {
-		padding: 2.5rem 0;
+		padding: 2.5rem 2.5rem;
 		display: flex;
 		align-items: center;
 		flex-direction: column;
@@ -30,7 +32,7 @@
 	}
 
 	h2 {
-		font-size: 2rem;
+		font-size: 18px;
 		font-weight: 500;
 	}
 </style>

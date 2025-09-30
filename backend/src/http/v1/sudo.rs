@@ -64,7 +64,7 @@ pub struct SudoEnableResponse {
         (status = 200, description = "Sudo has been enabled", body = SudoEnableResponse),
         (status = 401, description = "Not authenticated", body = ApiHttpError),
         // I don't know if I want to mention a sudo err here
-        (status = 400, description = "Validation or parsing error", body = ApiHttpError),
+        (status = 400, description = "Sudo is already enabled, validation or parsing error", body = ApiHttpError),
         (status = 422, description = "Missing required fields", body = ApiHttpError),
         (status = 403, description = "Sudo cannot be enabled with the chosen option", body = ApiHttpError),
     ),
@@ -142,7 +142,7 @@ async fn enable_sudo(
                 secret: "deleted".to_string(),
             }
             .store(
-                AuthFlowNamespace::OtpExchange,
+                AuthFlowNamespace::TotpExchange,
                 AuthFlowKey::UserFlow {
                     flow_id,
                     user_id: user.id,

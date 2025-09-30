@@ -43,6 +43,7 @@ pub fn routes() -> OpenApiRouter<Arc<GlobalState>> {
         .routes(routes!(reset_password_status))
         .routes(routes!(reset_password_check))
         .routes(routes!(reset_password_set))
+        .routes(routes!(password_change))
 }
 
 #[derive(Debug, serde::Deserialize, Validate, ToSchema)]
@@ -108,9 +109,9 @@ async fn login(
     //     return Err(ApiError::EmailIsNotVerified);
     // }
 
-    if user.password_hash.is_none() {
-        Err(ApiError::InvalidLogin)?;
-    }
+    let Some(ref password_hash) = user.password_hash else {
+        return Err(ApiError::InvalidLogin)?;
+    };
 
     let metadata = DeviceMetadata::from_headers(&headers);
 
@@ -118,7 +119,7 @@ async fn login(
     argon2
         .verify_password(
             request.password.as_bytes(),
-            &PasswordHash::new(user.password_hash.as_ref().unwrap())?,
+            &PasswordHash::new(password_hash)?,
         )
         .map_err(|_| ApiError::InvalidLogin)?;
 
@@ -139,6 +140,98 @@ async fn login(
         .await?;
 
     Ok(Json(models::Session::from(sess.session)))
+}
+
+#[derive(Debug, serde::Deserialize, Validate, ToSchema)]
+pub struct PasswordChange {
+    old_password: String,
+    new_password: String,
+}
+
+/// Change your password
+///
+/// This requires Sudo to be enabled, so you'll need to reauthenticate with a OTP code or TOTP code if you have it
+/// enabled.
+#[utoipa::path(
+    post,
+    path = "/change_password",
+    request_body = PasswordChange,
+    responses(
+        (status = 200, description = "Successfully changed the password"),
+        (status = 401, description = "Not authenticated or Sudo is not enabled", body = ApiHttpError),
+        (status = 400, description = "Invalid password input", body = ApiHttpError),
+        (status = 409, description = "The old password provided is the same as the new one", body = ApiHttpError),
+    ),
+    tag = PASSWORD_TAG,
+)]
+async fn password_change(
+    State(global): State<Arc<GlobalState>>,
+    Extension(auth_context): Extension<AuthContext>,
+    cookies: Cookies,
+    Valid(Json(request)): Valid<Json<PasswordChange>>,
+) -> HttpResult<()> {
+    if !auth_context.is_authenticated() {
+        return Err(ApiError::YouAreNotLoggedIn);
+    }
+
+    let Some(session) = Session::get(auth_context.session_id(), &global.database).await? else {
+        remove_session(auth_context, &cookies, &global).await?;
+        return Err(ApiError::InvalidLogin);
+    };
+
+    if !session.is_sudo_enabled() {
+        return Err(ApiError::SudoIsNotEnabled); // should be frontend's job to start the sudo flow
+    }
+
+    let Some(mut user) = User::get(auth_context.user_id(), &global.database).await? else {
+        remove_session(auth_context, &cookies, &global).await?;
+        return Err(ApiError::InvalidLogin);
+    };
+
+    let Some(password_hash) = user.password_hash else {
+        return Err(ApiError::InvalidOldPassword);
+    };
+
+    let strength = zxcvbn::zxcvbn(&request.new_password, &[&user.login, &user.email]).score();
+    if strength < zxcvbn::Score::Three {
+        return Err(ApiError::PasswordLowStrength);
+    }
+
+    let argon2 = Argon2::default();
+    if argon2
+        .verify_password(
+            request.new_password.as_bytes(),
+            &PasswordHash::new(&password_hash)?,
+        )
+        .is_ok()
+    {
+        return Err(ApiError::PasswordMatchesOld)?;
+    }
+
+    let argon2 = Argon2::default();
+    argon2
+        .verify_password(
+            request.old_password.as_bytes(),
+            &PasswordHash::new(&password_hash)?,
+        )
+        .map_err(|_| ApiError::InvalidOldPassword)?;
+
+    let argon2 = Argon2::default();
+    let salt = SaltString::generate(&mut ChaCha20Rng::from_entropy());
+    let password_hash = argon2
+        .hash_password(request.new_password.as_bytes(), &salt)?
+        .to_string();
+
+    let mut tx = global.database.begin().await?;
+    user.password_hash = Some(password_hash);
+    user.update(&mut tx).await?;
+    Session::delete_all_by_user_but_not_id(user.id, session.id, &mut tx).await?;
+    tx.commit().await?;
+
+    let mail = AuthEmails::PasswordResetFinished { login: user.login };
+    global.mailer.send(&user.email, mail).await?;
+
+    Ok(())
 }
 
 // #[derive(Debug, serde::Deserialize, Validate, ToSchema)]

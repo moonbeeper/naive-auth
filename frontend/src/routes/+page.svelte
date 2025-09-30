@@ -14,20 +14,20 @@
 </script>
 
 <script lang="ts">
-	import Button from '../components/button.svelte';
-	import Input from '../components/forms/input.svelte';
-	import { currentText } from '$lib/bigHeader';
-	import Link from '../components/link.svelte';
 	import { defaults, superForm, message as sMessage } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import { Control, Field } from 'formsnap';
-	import Label from '../components/forms/label.svelte';
-	import FieldErrors from '../components/forms/fieldErrors.svelte';
-	import client, { type ApiHttpError } from '$lib/api/baseFetch';
-	import Spinner from '../components/spinner.svelte';
 	import { goto } from '$app/navigation';
-	import FieldContainer from '../components/forms/fieldContainer.svelte';
-	import FormContainer from '../components/forms/formContainer.svelte';
+	import client, { type ApiHttpError } from '$lib/api/baseFetch';
+	import FormContainer from '$comps/forms/formContainer.svelte';
+	import FieldContainer from '$comps/forms/fieldContainer.svelte';
+	import Label from '$comps/forms/label.svelte';
+	import Input from '$comps/forms/input.svelte';
+	import FieldErrors from '$comps/forms/fieldErrors.svelte';
+	import Link from '$comps/link.svelte';
+	import Button from '$comps/button.svelte';
+	import Spinner from '$comps/spinner.svelte';
+	import { currentText } from '$lib/bigHeader';
 
 	currentText.set('Log in');
 	let passwordMode = $state(false);
@@ -79,7 +79,7 @@
 				}
 
 				if (res.response.ok) {
-					await goto('/yay');
+					await goto('/settings');
 				}
 			}
 		}
