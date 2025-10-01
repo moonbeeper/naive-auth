@@ -89,6 +89,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>My OAuth Apps | BeepAuth</title>
+</svelte:head>
+
 <CreateOauthAppDialog data={createApp} bind:open={showCreateDialog} />
 <SecretOauthAppDialog bind:open={showSecretDialog} data={creationResponse} />
 <UpdateOauthAppDialog bind:open={showUpdateDialog} data={updateDefaultData} />

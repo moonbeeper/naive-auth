@@ -43,8 +43,16 @@ impl EmailMan {
             .credentials(credentials)
             .port(settings.smtp.port)
             .tls(if settings.smtp.tls {
-                if let Some(tls_type) = &settings.smtp.tls_type {
-                    match tls_type {
+                settings.smtp.tls_type.as_ref().map_or_else(
+                    || {
+                        tracing::info!("TLS was enabled but no TLS type was specified. Using TLS");
+                        Tls::Wrapper(
+                            TlsParametersBuilder::new(settings.smtp.host.clone())
+                                .build()
+                                .expect("Failed to build TLS params"),
+                        )
+                    },
+                    |tls_type| match tls_type {
                         EmailServerTls::StartTls => {
                             tracing::info!("Using TLS with STARTTLS security.");
                             Tls::Required(
@@ -61,15 +69,8 @@ impl EmailMan {
                                     .expect("Failed to build TLS params"),
                             )
                         }
-                    }
-                } else {
-                    tracing::info!("TLS was enabled but no TLS type was specified. Using TLS");
-                    Tls::Wrapper(
-                        TlsParametersBuilder::new(settings.smtp.host.clone())
-                            .build()
-                            .expect("Failed to build TLS params"),
-                    )
-                }
+                    },
+                )
             } else {
                 Tls::None
             })

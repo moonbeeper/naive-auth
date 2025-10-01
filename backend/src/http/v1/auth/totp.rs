@@ -131,6 +131,7 @@ async fn exchange_login(
 
             let mail = AuthEmails::TOTPRecoverUsed {
                 login: user.login.clone(),
+                frontend_url: global.settings.http.frontend_url.clone(),
             };
             global.mailer.send(&user.email, mail).await?;
         }
@@ -156,6 +157,7 @@ async fn exchange_login(
                 AuthEmails::NewLogin {
                     login: user.login,
                     metadata,
+                    frontend_url: global.settings.http.frontend_url.clone(),
                 },
             )
             .await?;
@@ -418,12 +420,18 @@ async fn enable_exchange(
         user.totp_recovery_secret = Some(recovery_secret);
         user.totp_recovery_codes = 16;
         user.update(&mut tx).await?;
-        Session::delete_all_by_user(user.id, &mut tx).await?;
+        Session::delete_all_by_user_but_not_id(user.id, session.session_id(), &mut tx).await?;
         tx.commit().await?;
 
         global
             .mailer
-            .send(&user.email, AuthEmails::TOTPAdded { login: user.login })
+            .send(
+                &user.email,
+                AuthEmails::TOTPAdded {
+                    login: user.login,
+                    frontend_url: global.settings.http.frontend_url.clone(),
+                },
+            )
             .await?;
 
         return Ok(());

@@ -39,6 +39,11 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Authorized Apps | BeepAuth</title>
+</svelte:head>
+
+
 <div class="section">
 	<div class="title">
 		<h2>Authorized Apps</h2>

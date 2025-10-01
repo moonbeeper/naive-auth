@@ -119,6 +119,10 @@
 	};
 </script>
 
+<svelte:head>
+	<title>Reset Password Two-Factor | BeepAuth</title>
+</svelte:head>
+
 <main>
 	<div class="title">
 		{#if !recoveryMode}

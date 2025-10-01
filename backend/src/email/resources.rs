@@ -1,3 +1,4 @@
+#![allow(clippy::match_same_arms)]
 use std::sync::LazyLock;
 use tera::{Context, Tera};
 
@@ -45,6 +46,7 @@ pub enum AuthEmails {
         code: String,
         is_login: bool,
         is_sudo: bool,
+        frontend_url: String,
     },
     // OtpRecoverRequest {
     //     login: String,
@@ -53,12 +55,15 @@ pub enum AuthEmails {
     NewLogin {
         login: String,
         metadata: DeviceMetadata,
+        frontend_url: String,
     },
     TOTPAdded {
         login: String,
+        frontend_url: String,
     },
     TOTPRecoverUsed {
         login: String,
+        frontend_url: String,
     },
     // These can be used in the future if we want to do more than one email login
     // VerifyEmail {
@@ -74,19 +79,24 @@ pub enum AuthEmails {
         scopes: String,
         is_upgrade: bool,
         is_reauthorize: bool,
+        frontend_url: String,
     },
     TotpRecoveryViewed {
         login: String,
+        frontend_url: String,
     },
     TotpDisabled {
         login: String,
+        frontend_url: String,
     },
     PasswordReset {
         reset_url: String,
         raw_code: String,
+        frontend_url: String,
     },
     PasswordResetFinished {
         login: String,
+        frontend_url: String,
     },
 }
 
@@ -100,77 +110,97 @@ impl EmailResource for AuthEmails {
                 is_login,
                 code,
                 is_sudo,
+                frontend_url,
             } => {
                 context.insert("login", login);
                 context.insert("code", code);
                 context.insert("is_login", is_login);
                 context.insert("is_sudo", is_sudo);
+                context.insert("logo_url", &format!("{frontend_url}/email/favicon.png"));
                 // format!("Hi there {login}\nyour verification code is {code}")
             }
-            Self::NewLogin { login, metadata } => {
+            Self::NewLogin {
+                login,
+                metadata,
+                frontend_url,
+            } => {
                 context.insert("login", login);
                 context.insert("metadata", &metadata);
+                context.insert("logo_url", &format!("{frontend_url}/email/favicon.png"));
 
                 // format!("Hi there {login}, we noticed a new login to your account. thanks byeee")
             }
 
-            Self::TOTPAdded { login } => {
+            Self::TOTPAdded {
+                login,
+                frontend_url,
+            } => {
                 context.insert("login", login);
+                context.insert("logo_url", &format!("{frontend_url}/email/favicon.png"));
 
                 // format!("Hi there {login}, your 2FA is now enabled! *wahoo*")
             }
-            Self::TOTPRecoverUsed { login } => {
+            Self::TOTPRecoverUsed {
+                login,
+                frontend_url,
+            } => {
                 context.insert("login", login);
-
-                // format!("Hi there {login}, one of your recovery codes has been used")
+                context.insert("logo_url", &format!("{frontend_url}/email/favicon.png"));
             }
-            // Self::VerifyEmail { login, code } => {
-            //     context.insert("login", login);
-            //     context.insert("code", code);
-
-            //     // format!("Hi there {login}, here's your email verification code: {code}")
-            // }
-            // Self::EmailVerified { login } => {
-            //     context.insert("login", login);
-
-            //     // format!("Hi there {login}, your email address has been verified! *wahoooooooooo*")
-            // }
             Self::OauthApproved {
                 login,
                 app_name,
                 scopes,
                 is_upgrade,
                 is_reauthorize,
+                frontend_url,
             } => {
                 context.insert("login", login);
                 context.insert("app_name", app_name);
                 context.insert("scopes", scopes);
                 context.insert("is_upgrade", is_upgrade);
                 context.insert("is_reauthorize", is_reauthorize);
+                context.insert("logo_url", &format!("{frontend_url}/email/favicon.png"));
 
                 // format!(
                 //     "Hi there {login}, seems like you approved the Oauth app {app_name} with the following scopes: {scopes}.",
                 // )
             }
-            Self::TotpRecoveryViewed { login } => {
+            Self::TotpRecoveryViewed {
+                login,
+                frontend_url,
+            } => {
                 let now = chrono::Utc::now();
                 let date = now.format("%D").to_string();
                 let time = now.format("%H:%M").to_string();
                 context.insert("login", login);
                 context.insert("date", &date);
                 context.insert("time", &time);
+                context.insert("logo_url", &format!("{frontend_url}/email/favicon.png"));
             }
-            Self::TotpDisabled { login } => {
+            Self::TotpDisabled {
+                login,
+                frontend_url,
+            } => {
                 context.insert("login", login);
+                context.insert("logo_url", &format!("{frontend_url}/email/favicon.png"));
             }
             Self::PasswordReset {
                 reset_url,
                 raw_code,
+                frontend_url,
             } => {
                 context.insert("reset_url", reset_url);
                 context.insert("raw_code", &raw_code);
+                context.insert("logo_url", &format!("{frontend_url}/email/favicon.png"));
             }
-            Self::PasswordResetFinished { login } => context.insert("login", login),
+            Self::PasswordResetFinished {
+                login,
+                frontend_url,
+            } => {
+                context.insert("login", login);
+                context.insert("logo_url", &format!("{frontend_url}/email/favicon.png"));
+            }
         }
         context
     }

@@ -118,6 +118,7 @@ pub struct Authorize {
     ),
     tag = OAUTH_TAG
 )]
+#[allow(clippy::too_many_lines)]
 async fn authorize(
     State(global): State<Arc<GlobalState>>,
     Query(request): Query<Authorize>,
@@ -162,12 +163,11 @@ async fn authorize(
         None => client.callback_url,
     };
 
-    let requested_scopes = request.scope.as_deref().unwrap_or("user");
-
-    let requested_scopes = OauthScope::from_str(requested_scopes).map_err(|e| {
-        OauthErrorKind::FailedParsingScopes(e)
-            .with_redirect(request.state.clone(), Some(redirect_uri.clone()))
-    })?;
+    let requested_scopes = OauthScope::from_str(request.scope.as_deref().unwrap_or("user"))
+        .map_err(|e| {
+            OauthErrorKind::FailedParsingScopes(e)
+                .with_redirect(request.state.clone(), Some(redirect_uri.clone()))
+        })?;
     let client_scopes = OauthScope::from(client.scopes);
     if !client_scopes.contains(requested_scopes) {
         return Err(OauthErrorKind::InvalidScope.with_state(request.state.clone()));
@@ -188,6 +188,7 @@ async fn authorize(
                 scopes: OauthScope::from(item.scopes).to_string(),
                 is_upgrade,
                 is_reauthorize: true,
+                frontend_url: global.settings.http.frontend_url.clone(),
             };
             global.mailer.send(&user.email, email).await?;
 
@@ -431,6 +432,7 @@ async fn finish_authorize(
                 scopes: OauthScope::from(scope).to_string(),
                 is_upgrade,
                 is_reauthorize: false,
+                frontend_url: global.settings.http.frontend_url.clone(),
             };
             global.mailer.send(&user.email, email).await?;
 

@@ -59,6 +59,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Reset Password | BeepAuth</title>
+</svelte:head>
+
 <main>
 	<div class="title">
 		{#if !done}

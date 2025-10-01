@@ -79,6 +79,10 @@
 	const { enhance, form: formData, delayed, message } = form;
 </script>
 
+<svelte:head>
+	<title>Set New Password | BeepAuth</title>
+</svelte:head>
+
 <main>
 	<div class="title">
 		{#if !doneWorking}

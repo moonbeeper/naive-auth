@@ -9,6 +9,10 @@
 	let status = $derived(page.status ?? 500);
 </script>
 
+<svelte:head>
+	<title>Error | BeepAuth</title>
+</svelte:head>
+
 <main>
 	<h1>{status} Error.</h1>
 

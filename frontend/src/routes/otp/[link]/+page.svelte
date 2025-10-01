@@ -55,6 +55,10 @@
 	const { enhance, form: formData, delayed, message } = codeForm;
 </script>
 
+<svelte:head>
+	<title>OTP Login | BeepAuth</title>
+</svelte:head>
+
 <main>
 	<div class="title">
 		<h1>Check your email</h1>

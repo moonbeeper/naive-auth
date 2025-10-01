@@ -39,3 +39,8 @@ export function redirectIfAuthenticated() {
 		redirect(303, '/settings');
 	}
 }
+
+export const getTotpQrData = (secret: string, email: string): string => {
+	const template = 'otpauth://totp/BeepAuth:{email}?secret={secret}&issuer=BeepAuth';
+	return template.replace('{email}', encodeURIComponent(email)).replace('{secret}', secret);
+};

@@ -23,6 +23,10 @@
 	import Button from '$comps/button.svelte';
 	import FieldErrors from '$comps/forms/fieldErrors.svelte';
 	import { blur, crossfade, fade, fly, slide } from 'svelte/transition';
+	import type { components } from '$lib/api/v1';
+	import TotpEnabledDialog from '$comps/forms/dialogs/totpEnabledDialog.svelte';
+	import EnableTotpDialog from '$comps/forms/dialogs/enableTotpDialog.svelte';
+	import ViewTotpSecrets from '$comps/forms/dialogs/viewTotpSecrets.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -126,7 +130,79 @@
 			invalidateAll();
 		}
 	}
+
+	let enableTotpData = $state<components['schemas']['EnableResponse']>({
+		recovery_codes: ['deadbeef'],
+		secret: 'deadbeef'
+	});
+	let enableTotpDialog = $state(false);
+	let totpEnabledDialog = $state(false);
+	async function enableTotp() {
+		const res = await client.POST('/v1/auth/totp/enable');
+
+		if (res.error?.error === ('TOTPIsAlreadyEnabled' as ApiHttpError)) {
+			console.error(res.error);
+			invalidateAll();
+		} else if (res.error) {
+			console.error(res.error);
+			invalidateAll();
+		}
+
+		if (res.response.ok && res.data) {
+			enableTotpData = res.data;
+			enableTotpDialog = true;
+		}
+	}
+
+	let disableTotpLoading = $state(false);
+	async function disableTotp() {
+		disableTotpLoading = true;
+
+		const res = await client.DELETE('/v1/totp');
+
+		if (res.error?.error === ('SudoIsNotEnabled' as ApiHttpError)) {
+			await goto('/sudo');
+		} else if (res.error) {
+			console.error(res.error);
+			invalidateAll();
+		}
+
+		if (res.response.ok) {
+			disableTotpLoading = false;
+			invalidateAll();
+		}
+	}
+
+	let seeRecoveryCodesData = $state<string[]>([]);
+	let seeRecoveryCodeDialog = $state(false);
+	async function viewTotpRecoveryCodes() {
+		const res = await client.GET('/v1/totp/recovery');
+
+		if (res.error?.error === ('SudoIsNotEnabled' as ApiHttpError)) {
+			await goto('/sudo');
+		} else if (res.error) {
+			console.error(res.error);
+			invalidateAll();
+		}
+
+		if (res.response.ok && res.data) {
+			seeRecoveryCodesData = res.data.recovery_codes;
+			seeRecoveryCodeDialog = true;
+		}
+	}
 </script>
+
+<svelte:head>
+	<title>Authentication | BeepAuth</title>
+</svelte:head>
+
+<TotpEnabledDialog bind:open={totpEnabledDialog} />
+<EnableTotpDialog
+	bind:open={enableTotpDialog}
+	data={enableTotpData}
+	bind:otherOpen={totpEnabledDialog}
+/>
+<ViewTotpSecrets bind:open={seeRecoveryCodeDialog} recoveryCodes={seeRecoveryCodesData} />
 
 <div class="section">
 	<div class="title">
@@ -211,6 +287,28 @@
 	</div>
 </div>
 
+<div class="section">
+	<div class="title">
+		<h2>Two-Factor Authentication</h2>
+	</div>
+
+	{#if $user?.totp_enabled}
+		<p>Two-Factor Authentication is <strong>enabled</strong> for your account.</p>
+		<div class="two-factor-buttons">
+			<Button
+				disabled={disableTotpLoading}
+				loading={disableTotpLoading}
+				onclick={viewTotpRecoveryCodes}>View two-factor recovery codes</Button
+			>
+			<Button bad onclick={disableTotp} disabled={disableTotpLoading} loading={disableTotpLoading}
+				>Disable two-factor authentication</Button
+			>
+		</div>
+	{:else}
+		<p>Two-Factor Authentication is <strong>not enabled</strong> for your account.</p>
+		<Button primary onclick={() => enableTotp()}>Enable two-factor authentication</Button>
+	{/if}
+</div>
 <div class="section">
 	<div class="title">
 		<h2>Open Sessions</h2>
@@ -332,6 +430,11 @@
 		p {
 			font-size: 14px;
 		}
+	}
+
+	.two-factor-buttons {
+		display: flex;
+		gap: 0.5rem;
 	}
 
 	.session {

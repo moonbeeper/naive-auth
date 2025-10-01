@@ -1,28 +1,29 @@
 <script lang="ts">
 	import Button from '$comps/button.svelte';
-	import { ClipboardIcon, X } from '@lucide/svelte';
+	import { CircleCheckBig, X } from '@lucide/svelte';
 	import { Dialog } from 'bits-ui';
+	import Input from '../input.svelte';
 	import { fade, scale } from 'svelte/transition';
 	import type { components } from '$lib/api/v1';
-	import { copyText } from 'svelte-copy';
+	import { scopeDefinitions } from '$lib/oauthScopes';
+	import { defaults, setError, superForm } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
+	import client, { type ApiHttpError } from '$lib/api/baseFetch';
+	import { Control, Field } from 'formsnap';
+	import FieldContainer from '../fieldContainer.svelte';
+	import Label from '../label.svelte';
+	import Textarea from '../textarea.svelte';
+	import FormContainer from '../formContainer.svelte';
+	import FieldErrors from '../fieldErrors.svelte';
+	import Select from '../Select';
 	import { invalidateAll } from '$app/navigation';
 
 	// TODO: this should be separated into components.
 
-	let {
-		open = $bindable(),
-		data
-	}: { open: boolean; data: components['schemas']['CreateAppResponse'] } = $props();
+	let { open: isOpen = $bindable() }: { open: boolean } = $props();
 </script>
 
-<Dialog.Root
-	bind:open
-	onOpenChange={(e) => {
-		if (!e) {
-			invalidateAll();
-		}
-	}}
->
+<Dialog.Root bind:open={isOpen}>
 	<Dialog.Portal>
 		<Dialog.Overlay class="dialog-overlay" forceMount>
 			{#snippet child({ props, open })}
@@ -31,17 +32,12 @@
 				{/if}
 			{/snippet}
 		</Dialog.Overlay>
-		<Dialog.Content
-			class="dialog-root-content"
-			forceMount
-			escapeKeydownBehavior="ignore"
-			interactOutsideBehavior="ignore"
-		>
+		<Dialog.Content class="dialog-root-content" forceMount>
 			{#snippet child({ props, open })}
 				{#if open}
 					<div {...props} in:scale={{ duration: 200 }}>
 						<div class="dialog-header">
-							<Dialog.Title>App secrets</Dialog.Title>
+							<Dialog.Title>Two-Factor Authentication Enabled</Dialog.Title>
 							<Dialog.Close>
 								{#snippet child({ props })}
 									<Button primary {...props}>
@@ -53,31 +49,13 @@
 							</Dialog.Close>
 						</div>
 						<div class="dialog-content">
-							<p style="font-weight: 700; text-decoration: underline;">
-								Save your app secret now!! It won't be shown again.
-							</p>
-							<div class="secret-container">
-								<p>App ID:</p>
-								<div class="secret">
-									<span><strong>{data.id}</strong></span>
-									<Button small onclick={() => copyText(data.id)}>
-										{#snippet icon()}
-											<ClipboardIcon size="20" />
-										{/snippet}
-									</Button>
-								</div>
+							<div class="icon-container">
+								<CircleCheckBig class="icon" />
 							</div>
-							<div class="secret-container">
-								<p>App Secret:</p>
-								<div class="secret">
-									<span><strong>{data.secret_key}</strong></span>
-									<Button small onclick={() => copyText(data.secret_key)}>
-										{#snippet icon()}
-											<ClipboardIcon size="20" />
-										{/snippet}
-									</Button>
-								</div>
-							</div>
+							<p>Two-Factor authentication has been successfully enabled for your account!</p>
+						</div>
+						<div class="dialog-footer">
+							<Button primary onclick={() => (isOpen = false)}>Close</Button>
 						</div>
 					</div>
 				{/if}
@@ -130,29 +108,29 @@
 			display: flex;
 			flex-direction: column;
 			gap: 1rem;
-			overflow: hidden;
+			align-items: center;
 
-			span {
-				padding: 0.5rem;
-				background-color: var(--bg-semidark);
-				font-family: var(--font-mono);
-				border-radius: 8px;
-				white-space: nowrap;
-				text-overflow: ellipsis;
-				overflow: hidden;
-			}
-
-			.secret-container {
+			.icon-container {
 				display: flex;
-				flex-direction: column;
-				gap: 0.5rem;
-			}
-
-			.secret {
-				display: flex;
+				width: 100%;
+				margin-inline: auto;
 				align-items: center;
-				gap: 0.5rem;
+				justify-content: center;
 			}
+
+			:global(.icon) {
+				color: var(--color-yellow);
+				width: 48px;
+				height: 48px;
+			}
+		}
+
+		.dialog-footer {
+			padding: var(--dialog-padding);
+			padding-top: 0;
+			display: flex;
+			flex-direction: row-reverse;
+			gap: 0.5rem;
 		}
 	}
 </style>

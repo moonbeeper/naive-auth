@@ -74,7 +74,10 @@ async fn get_totp_recovery(
     let recovery_codes: Vec<String> =
         get_totp_recovery_codes(user.totp_recovery_secret.as_ref().unwrap());
 
-    let mail = AuthEmails::TotpRecoveryViewed { login: user.login };
+    let mail = AuthEmails::TotpRecoveryViewed {
+        login: user.login,
+        frontend_url: global.settings.http.frontend_url.clone(),
+    };
     global.mailer.send(&user.email, mail).await?;
 
     Ok(Json(TotpRecoveryResponse { recovery_codes }))
@@ -128,7 +131,10 @@ async fn disable(
     user.update(&mut tx).await?;
     tx.commit().await?;
 
-    let mail = AuthEmails::TotpDisabled { login: user.login };
+    let mail = AuthEmails::TotpDisabled {
+        login: user.login,
+        frontend_url: global.settings.http.frontend_url.clone(),
+    };
     global.mailer.send(&user.email, mail).await?;
 
     Ok(())

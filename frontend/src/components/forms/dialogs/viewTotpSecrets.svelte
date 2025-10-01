@@ -1,28 +1,32 @@
 <script lang="ts">
 	import Button from '$comps/button.svelte';
-	import { ClipboardIcon, X } from '@lucide/svelte';
+	import { CircleCheckBig, X } from '@lucide/svelte';
 	import { Dialog } from 'bits-ui';
+	import Input from '../input.svelte';
 	import { fade, scale } from 'svelte/transition';
 	import type { components } from '$lib/api/v1';
-	import { copyText } from 'svelte-copy';
+	import { scopeDefinitions } from '$lib/oauthScopes';
+	import { defaults, setError, superForm } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
+	import client, { type ApiHttpError } from '$lib/api/baseFetch';
+	import { Control, Field } from 'formsnap';
+	import FieldContainer from '../fieldContainer.svelte';
+	import Label from '../label.svelte';
+	import Textarea from '../textarea.svelte';
+	import FormContainer from '../formContainer.svelte';
+	import FieldErrors from '../fieldErrors.svelte';
+	import Select from '../Select';
 	import { invalidateAll } from '$app/navigation';
 
 	// TODO: this should be separated into components.
 
 	let {
-		open = $bindable(),
-		data
-	}: { open: boolean; data: components['schemas']['CreateAppResponse'] } = $props();
+		open: isOpen = $bindable(),
+		recoveryCodes = $bindable()
+	}: { open: boolean; recoveryCodes: string[] } = $props();
 </script>
 
-<Dialog.Root
-	bind:open
-	onOpenChange={(e) => {
-		if (!e) {
-			invalidateAll();
-		}
-	}}
->
+<Dialog.Root bind:open={isOpen}>
 	<Dialog.Portal>
 		<Dialog.Overlay class="dialog-overlay" forceMount>
 			{#snippet child({ props, open })}
@@ -31,17 +35,12 @@
 				{/if}
 			{/snippet}
 		</Dialog.Overlay>
-		<Dialog.Content
-			class="dialog-root-content"
-			forceMount
-			escapeKeydownBehavior="ignore"
-			interactOutsideBehavior="ignore"
-		>
+		<Dialog.Content class="dialog-root-content" forceMount>
 			{#snippet child({ props, open })}
 				{#if open}
 					<div {...props} in:scale={{ duration: 200 }}>
 						<div class="dialog-header">
-							<Dialog.Title>App secrets</Dialog.Title>
+							<Dialog.Title>Two-Factor Authentication Secrets</Dialog.Title>
 							<Dialog.Close>
 								{#snippet child({ props })}
 									<Button primary {...props}>
@@ -53,31 +52,21 @@
 							</Dialog.Close>
 						</div>
 						<div class="dialog-content">
-							<p style="font-weight: 700; text-decoration: underline;">
-								Save your app secret now!! It won't be shown again.
+							<p>
+								<strong>Save these back-up codes in a safe place</strong>. They are used when you
+								lose access to your authenticator app and need to be able to log in again. These
+								codes can be only used once.
 							</p>
-							<div class="secret-container">
-								<p>App ID:</p>
-								<div class="secret">
-									<span><strong>{data.id}</strong></span>
-									<Button small onclick={() => copyText(data.id)}>
-										{#snippet icon()}
-											<ClipboardIcon size="20" />
-										{/snippet}
-									</Button>
-								</div>
-							</div>
-							<div class="secret-container">
-								<p>App Secret:</p>
-								<div class="secret">
-									<span><strong>{data.secret_key}</strong></span>
-									<Button small onclick={() => copyText(data.secret_key)}>
-										{#snippet icon()}
-											<ClipboardIcon size="20" />
-										{/snippet}
-									</Button>
-								</div>
-							</div>
+							<ul class="recovery-container">
+								{#each recoveryCodes as code}
+									<li style="width: 50%; float: left; text-align: center; padding-inline: 8px;">
+										{code}
+									</li>
+								{/each}
+							</ul>
+						</div>
+						<div class="dialog-footer">
+							<Button primary onclick={() => (isOpen = false)}>Close</Button>
 						</div>
 					</div>
 				{/if}
@@ -130,29 +119,25 @@
 			display: flex;
 			flex-direction: column;
 			gap: 1rem;
-			overflow: hidden;
+			align-items: center;
 
-			span {
-				padding: 0.5rem;
+			.recovery-container {
 				background-color: var(--bg-semidark);
-				font-family: var(--font-mono);
 				border-radius: 8px;
-				white-space: nowrap;
-				text-overflow: ellipsis;
-				overflow: hidden;
+				padding: 0.5rem 0;
+				border: 1px solid var(--color-yellow);
+				font-family: var(--font-mono);
+				margin-inline: auto;
+				width: 300px;
 			}
+		}
 
-			.secret-container {
-				display: flex;
-				flex-direction: column;
-				gap: 0.5rem;
-			}
-
-			.secret {
-				display: flex;
-				align-items: center;
-				gap: 0.5rem;
-			}
+		.dialog-footer {
+			padding: var(--dialog-padding);
+			padding-top: 0;
+			display: flex;
+			flex-direction: row-reverse;
+			gap: 0.5rem;
 		}
 	}
 </style>

@@ -42,6 +42,9 @@ importers:
       '@eslint/js':
         specifier: ^9.18.0
         version: 9.34.0
+      '@svelte-put/qr':
+        specifier: ^2.1.0
+        version: 2.1.0(svelte@5.38.6)
       '@sveltejs/adapter-static':
         specifier: ^3.0.8
         version: 3.0.9(@sveltejs/kit@2.37.0(@sveltejs/vite-plugin-svelte@6.1.4(svelte@5.38.6)(vite@7.1.4(sass-embedded@1.92.0)(sass@1.92.0)))(svelte@5.38.6)(vite@7.1.4(sass-embedded@1.92.0)(sass@1.92.0)))
@@ -615,6 +618,11 @@ packages:
   '@standard-schema/spec@1.0.0':
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
 
+  '@svelte-put/qr@2.1.0':
+    resolution: {integrity: sha512-7HzQjoNZI9k6J4R6tnMi0ZGtRQKIFmZqzeo2GtkKZkumtPYByuqjGcB/ApFkxfg+J5mARKezWzKiq9EDJ6htRg==}
+    peerDependencies:
+      svelte: ^5.1.0
+
   '@sveltejs/acorn-typescript@1.0.5':
     resolution: {integrity: sha512-IwQk4yfwLdibDlrXVE04jTZYlLnwsTT2PIOQQGNLWfjavGifnk1JD1LcZjZaBTRcxZu2FfPfNLOE04DSu9lqtQ==}
     peerDependencies:
@@ -1065,6 +1073,9 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
+
+  headless-qr@1.0.3:
+    resolution: {integrity: sha512-HHVwf1i++Ho2vFstHxAdfP0OjB7Di44nGXbh3VXciuzwkuFb1oeFDCrfOLjFgHip/Kbc/wq2GOaSTiKQ81K/Yg==}
 
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
@@ -2186,6 +2197,11 @@ snapshots:
 
   '@standard-schema/spec@1.0.0': {}
 
+  '@svelte-put/qr@2.1.0(svelte@5.38.6)':
+    dependencies:
+      headless-qr: 1.0.3
+      svelte: 5.38.6
+
   '@sveltejs/acorn-typescript@1.0.5(acorn@8.15.0)':
     dependencies:
       acorn: 8.15.0
@@ -2711,6 +2727,8 @@ snapshots:
   graphemer@1.4.0: {}
 
   has-flag@4.0.0: {}
+
+  headless-qr@1.0.3: {}
 
   https-proxy-agent@7.0.6(supports-color@10.2.0):
     dependencies:

@@ -103,6 +103,7 @@ async fn login(
         code,
         is_login: true,
         is_sudo: false,
+        frontend_url: global.settings.http.frontend_url.clone(),
     };
 
     global.mailer.send(&user.email, email).await?;
@@ -134,6 +135,7 @@ async fn register(global: Arc<GlobalState>, email: String) -> HttpResult<Json<Au
         code: code.to_string(),
         is_login: false,
         is_sudo: false,
+        frontend_url: global.settings.http.frontend_url.clone(),
     };
 
     global.mailer.send(&email, mailer_email).await?;
@@ -240,6 +242,7 @@ async fn exchange_login(
                 AuthEmails::NewLogin {
                     login: user.login,
                     metadata,
+                    frontend_url: global.settings.http.frontend_url.clone(),
                 },
             )
             .await?;
@@ -287,6 +290,7 @@ async fn exchange_login(
                 AuthEmails::NewLogin {
                     login: user.login,
                     metadata,
+                    frontend_url: global.settings.http.frontend_url.clone(),
                 },
             )
             .await?;

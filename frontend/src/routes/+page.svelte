@@ -105,6 +105,10 @@
 	};
 </script>
 
+<svelte:head>
+	<title>Login | BeepAuth</title>
+</svelte:head>
+
 <main>
 	<h1>Log in to your account</h1>
 

@@ -105,6 +105,11 @@
 	};
 </script>
 
+<svelte:head>
+	<title>Enable Sudo Two-Factor | BeepAuth</title>
+</svelte:head>
+
+
 <main>
 	<div class="title">
 		{#if !recoveryMode}

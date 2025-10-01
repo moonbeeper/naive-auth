@@ -136,7 +136,14 @@ async fn login(
     cookies.add(sess.cookie);
     global
         .mailer
-        .send(&user.email, AuthEmails::NewLogin { login, metadata })
+        .send(
+            &user.email,
+            AuthEmails::NewLogin {
+                login,
+                metadata,
+                frontend_url: global.settings.http.frontend_url.clone(),
+            },
+        )
         .await?;
 
     Ok(Json(models::Session::from(sess.session)))
@@ -228,7 +235,10 @@ async fn password_change(
     Session::delete_all_by_user_but_not_id(user.id, session.id, &mut tx).await?;
     tx.commit().await?;
 
-    let mail = AuthEmails::PasswordResetFinished { login: user.login };
+    let mail = AuthEmails::PasswordResetFinished {
+        login: user.login,
+        frontend_url: global.settings.http.frontend_url.clone(),
+    };
     global.mailer.send(&user.email, mail).await?;
 
     Ok(())
@@ -373,6 +383,7 @@ async fn reset_password(
     let email = AuthEmails::PasswordReset {
         reset_url,
         raw_code: flow_id.to_string(),
+        frontend_url: global.settings.http.frontend_url.clone(),
     };
     global.mailer.send(&user.email, email).await?;
 
@@ -537,7 +548,10 @@ async fn reset_password_check(
             user.update(&mut tx).await?;
             tx.commit().await?;
 
-            let mail = AuthEmails::TOTPRecoverUsed { login: user.login };
+            let mail = AuthEmails::TOTPRecoverUsed {
+                login: user.login,
+                frontend_url: global.settings.http.frontend_url.clone(),
+            };
             global.mailer.send(&user.email, mail).await?;
         }
 
@@ -671,7 +685,10 @@ async fn reset_password_set(
         user.update(&mut tx).await?;
         tx.commit().await?;
 
-        let mail = AuthEmails::PasswordResetFinished { login: user.login };
+        let mail = AuthEmails::PasswordResetFinished {
+            login: user.login,
+            frontend_url: global.settings.http.frontend_url.clone(),
+        };
         global.mailer.send(&user.email, mail).await?;
 
         return Ok(());

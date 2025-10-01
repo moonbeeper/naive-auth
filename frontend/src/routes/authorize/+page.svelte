@@ -18,6 +18,10 @@
 	});
 </script>
 
+<svelte:head>
+	<title>Authorize App | BeepAuth</title>
+</svelte:head>
+
 <main>
 	<div class="container">
 		<h1>Authorize {data.name}</h1>

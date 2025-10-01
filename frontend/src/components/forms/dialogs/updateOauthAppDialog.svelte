@@ -26,7 +26,7 @@
 	import { fade, scale } from 'svelte/transition';
 	import type { components } from '$lib/api/v1';
 	import { scopeDefinitions } from '$lib/oauthScopes';
-	import { defaults, setError, superForm } from 'sveltekit-superforms';
+	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import client, { type ApiHttpError } from '$lib/api/baseFetch';
 	import { Control, Field } from 'formsnap';
@@ -75,11 +75,11 @@
 
 				// sorry... am to hecking lazy to make proper error handling for this dialog and everything else. zzz
 				if (res.error?.error === ('OAuthAppNotFound' as ApiHttpError)) {
-					invalidateAll();
 					isOpen = false;
+					invalidateAll();
 				} else if (res.error?.error === ('OAuthAppNotOwned' as ApiHttpError)) {
-					invalidateAll();
 					isOpen = false;
+					invalidateAll();
 				} else if (res.error) {
 					console.error(res.error);
 				}

@@ -105,6 +105,10 @@
 	};
 </script>
 
+<svelte:head>
+	<title>Enter Two-Factor Code | BeepAuth</title>
+</svelte:head>
+
 <main>
 	<div class="title">
 		{#if !recoveryMode}

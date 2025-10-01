@@ -6,6 +6,10 @@
 	currentText.set('Reset Password');
 </script>
 
+<svelte:head>
+	<title>Password Updated | BeepAuth</title>
+</svelte:head>
+
 <main>
 	<div class="title">
 		<h1>Password updated!</h1>

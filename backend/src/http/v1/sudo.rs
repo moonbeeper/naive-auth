@@ -127,6 +127,7 @@ async fn enable_sudo(
                 code: code.to_string(),
                 is_login: false,
                 is_sudo: true,
+                frontend_url: global.settings.http.frontend_url.clone(),
             };
             global.mailer.send(&user.email, mailer_email).await?;
 
