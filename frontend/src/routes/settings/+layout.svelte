@@ -7,6 +7,7 @@
 	import { user } from '$lib/auth';
 	import { currentText } from '$lib/bigHeader';
 	import { Blocks, LogOut, PlugZap, Shield, UserRound } from '@lucide/svelte';
+	import { onMount } from 'svelte';
 
 	currentText.set('Settings');
 
@@ -26,12 +27,22 @@
 		user.set(null); // clear it even if it fails lol
 		await goto('/');
 	}
+
+	let long_loading = $state(false);
+	onMount(() => {
+		setTimeout(() => {
+			long_loading = true;
+		}, 4000);
+	});
 </script>
 
 <main>
 	{#if !$user}
 		<div class="wowie">
 			<Spinner />
+			{#if long_loading}
+				<p>Seems like this is taking a while... Try refreshing the page?</p>
+			{/if}
 		</div>
 	{:else}
 		<div class="layout">
@@ -156,12 +167,15 @@
 		width: 100%;
 		display: flex;
 		justify-content: center;
+		align-items: center;
+		flex-direction: column;
 	}
 	.content {
 		display: flex;
 		flex-direction: column;
 		height: 100%;
 		width: 100%;
-        padding-bottom: 1rem;
+		padding-bottom: 1rem;
+		gap: 1.5rem;
 	}
 </style>

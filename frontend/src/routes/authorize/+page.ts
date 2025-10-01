@@ -1,3 +1,5 @@
+export const ssr = false;
+
 import type { PageLoad } from './$types';
 import { browser } from '$app/environment';
 import { redirectIfNotAuthenticated, updateAuth } from '$lib/auth';

@@ -125,7 +125,8 @@ async fn enable_sudo(
             let mailer_email = AuthEmails::OtpRequest {
                 identifier: user.login,
                 code: code.to_string(),
-                is_login: true,
+                is_login: false,
+                is_sudo: true,
             };
             global.mailer.send(&user.email, mailer_email).await?;
 

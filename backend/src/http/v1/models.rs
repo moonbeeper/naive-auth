@@ -93,11 +93,7 @@ impl From<database::models::oauth::OauthApp> for OauthApp {
             id: value.id,
             name: value.name,
             description: value.description,
-            scopes: OauthScope::from(value.scopes)
-                .to_string()
-                .split(',')
-                .map(String::from)
-                .collect(),
+            scopes: OauthScope::from(value.scopes).as_vec(),
             callback_url: value.callback_url,
             created_at: value.created_at,
         }
@@ -107,24 +103,10 @@ impl From<database::models::oauth::OauthApp> for OauthApp {
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct OauthAuthorized {
     pub id: OauthAuthorizedId,
-    pub app: OauthAppId,
-    pub user_id: UserId,
+    pub name: String,
     pub scopes: Vec<String>,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-impl From<database::models::oauth::OauthAuthorized> for OauthAuthorized {
-    fn from(value: database::models::oauth::OauthAuthorized) -> Self {
-        Self {
-            id: value.id,
-            app: value.app,
-            user_id: value.user_id,
-            scopes: OauthScope::from(value.scopes).as_vec(),
-            created_at: value.created_at,
-            updated_at: value.updated_at,
-        }
-    }
+    pub created_by: String,
+    pub last_used_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]

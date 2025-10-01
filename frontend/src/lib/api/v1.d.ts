@@ -14,8 +14,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Login via user login or email and password
-         * @description Simple login with password. If the user has TOTP enabled, you'll get a TOTP challenge instead of a session.
+         * Change your password
+         * @description This requires Sudo to be enabled, so you'll need to reauthenticate with a OTP code or TOTP code if you have it
+         *     enabled.
          */
         post: operations["password_change"];
         delete?: never;
@@ -704,14 +705,12 @@ export interface components {
             scopes: string[];
         };
         OauthAuthorized: {
-            app: components["schemas"]["StringId"];
-            /** Format: date-time */
-            created_at: string;
+            created_by: string;
             id: components["schemas"]["Ulid"];
-            scopes: string[];
             /** Format: date-time */
-            updated_at: string;
-            user_id: components["schemas"]["Ulid"];
+            last_used_at: string;
+            name: string;
+            scopes: string[];
         };
         OauthHttpError: {
             error: string;
@@ -2309,7 +2308,7 @@ export interface operations {
                     "application/json": components["schemas"]["SudoEnableResponse"];
                 };
             };
-            /** @description Validation or parsing error */
+            /** @description Sudo is already enabled, validation or parsing error */
             400: {
                 headers: {
                     [name: string]: unknown;

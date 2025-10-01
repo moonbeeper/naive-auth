@@ -205,7 +205,7 @@ impl Session {
     }
 
     pub fn is_sudo_enabled(&self) -> bool {
-        println!("Sudo enabled at: {:?}", self.sudo_enabled_at);
+        // println!("Sudo enabled at: {:?}", self.sudo_enabled_at);
         let Some(sudo_enabled_at) = self.sudo_enabled_at else {
             return false;
         };

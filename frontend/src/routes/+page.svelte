@@ -6,9 +6,7 @@
 	});
 
 	const passwordSchema = z.object({
-		email: z
-			.email("I don't think that's a valid email")
-			.or(z.string().trim().min(6, 'Your login should be at least 6 characters long')),
+		login: z.string().trim().min(6, 'Your login should be at least 6 characters long'),
 		password: z.string().trim().min(8, 'Password must be at least 8 characters long')
 	});
 </script>
@@ -28,6 +26,7 @@
 	import Button from '$comps/button.svelte';
 	import Spinner from '$comps/spinner.svelte';
 	import { currentText } from '$lib/bigHeader';
+	import { slide } from 'svelte/transition';
 
 	currentText.set('Log in');
 	let passwordMode = $state(false);
@@ -65,7 +64,7 @@
 			if (f.valid) {
 				const res = await client.POST('/v1/auth/login', {
 					body: {
-						login: f.data.email,
+						login: f.data.login,
 						password: f.data.password
 					}
 				});
@@ -152,7 +151,9 @@
 			<Button big primary full_width type="submit" disabled={$otpDelayed} loading={$otpDelayed}>
 				{#snippet icon()}
 					{#if $otpDelayed}
-						<Spinner dark />
+						<span transition:slide={{ axis: 'x' }}>
+							<Spinner dark />
+						</span>
 					{/if}
 				{/snippet}
 				Continue with Email
@@ -161,7 +162,7 @@
 	{:else}
 		<form class="container" use:passwordEnhance>
 			<FormContainer>
-				<Field form={passwordForm} name="email">
+				<Field form={passwordForm} name="login">
 					<FieldContainer>
 						<Control>
 							{#snippet children({ props })}
@@ -169,11 +170,11 @@
 								<Input
 									{...props}
 									disabled={$passwordDelayed}
-									type="email"
 									placeholder="beep@example.com"
 									big
-									autocomplete="email"
-									bind:value={$passwordFormData.email}
+									autocomplete="username"
+									type="text"
+									bind:value={$passwordFormData.login}
 								/>
 							{/snippet}
 						</Control>
@@ -220,7 +221,9 @@
 			>
 				{#snippet icon()}
 					{#if $passwordDelayed}
-						<Spinner dark />
+						<span transition:slide={{ axis: 'x' }}>
+							<Spinner dark />
+						</span>
 					{/if}
 				{/snippet}
 

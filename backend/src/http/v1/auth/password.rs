@@ -341,11 +341,11 @@ pub struct ResetPassword {
 )]
 async fn reset_password(
     State(global): State<Arc<GlobalState>>,
-    Extension(session): Extension<AuthContext>,
-    cookies: Cookies,
+    // Extension(session): Extension<AuthContext>,
+    // cookies: Cookies,
     Valid(Json(request)): Valid<Json<ResetPassword>>,
 ) -> HttpResult<()> {
-    remove_session(session, &cookies, &global).await?; // force logout
+    // remove_session(session, &cookies, &global).await?; // force logout
     let Some(user) = User::get_by_email(&request.email, &global.database).await? else {
         // fail silently by just returning ok
         return Ok(());

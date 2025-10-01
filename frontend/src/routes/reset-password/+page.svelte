@@ -19,6 +19,7 @@
 	import FieldErrors from '$comps/forms/fieldErrors.svelte';
 	import Button from '$comps/button.svelte';
 	import Spinner from '$comps/spinner.svelte';
+	import { slide } from 'svelte/transition';
 
 	currentText.set('Reset Password');
 
@@ -66,7 +67,8 @@
 		{:else}
 			<h1>Reset link sent!</h1>
 			<p>
-				We sent an email with your reset link at <strong>{email.trimEnd()}</strong>. Check your inbox!
+				We sent an email with your reset link at <strong>{email.trimEnd()}</strong>. Check your
+				inbox!
 			</p>
 		{/if}
 	</div>
@@ -103,9 +105,9 @@
 
 			<Button big primary full_width type="submit" disabled={$delayed} loading={$delayed}>
 				{#snippet icon()}
-					{#if $delayed}
+					<span transition:slide={{ axis: 'x' }}>
 						<Spinner dark />
-					{/if}
+					</span>
 				{/snippet}
 				Send reset link
 			</Button>

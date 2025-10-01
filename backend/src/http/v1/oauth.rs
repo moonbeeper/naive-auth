@@ -2,6 +2,7 @@ use std::{str::FromStr, sync::Arc};
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{Extension, extract::State};
+use futures_util::future::join_all;
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng as _};
 use tower_cookies::Cookies;
 use url::Url;
@@ -270,7 +271,7 @@ async fn update_app(
     }
 
     let mut tx = global.database.begin().await?;
-    OauthApp::delete(&param.id, &mut tx).await?;
+    OauthApp::update(&app, &mut tx).await?; // omg WHY IS DELETE!!?!?!?!?
     tx.commit().await?;
 
     Ok(())
@@ -329,10 +330,30 @@ async fn list_authorized(
     };
 
     let apps = OauthAuthorized::get_many_by_userid(user.id, &global.database).await?;
-    let apps: Vec<_> = apps
-        .into_iter()
-        .map(models::OauthAuthorized::from)
-        .collect();
+    let apps: Vec<models::OauthAuthorized> = join_all(apps.iter().map(|s| async {
+        let Ok(app) = OauthApp::get(&s.app, &global.database).await else {
+            return None;
+        };
+        let app = app?;
+
+        let Ok(user) = User::get(s.user_id, &global.database).await else {
+            return None;
+        };
+        let user = user?;
+
+        Some(models::OauthAuthorized {
+            id: s.id,
+            name: app.name,
+            scopes: OauthScope::from(s.scopes).as_vec(),
+            created_by: user.login,
+            last_used_at: s.updated_at,
+        })
+    }))
+    .await
+    .into_iter()
+    .flatten()
+    .collect();
+    // let apps: Vec<_> = apps.into_iter().map(async move |s| {}).collect();
 
     Ok(Json(apps))
 }
@@ -424,7 +445,21 @@ async fn get_authorized(
         return Err(ApiError::OAuthAuthorizationNotFound(request.id.to_string()));
     }
 
-    Ok(Json(models::OauthAuthorized::from(app)))
+    let Some(oauth_app) = OauthApp::get(&app.app, &global.database).await? else {
+        return Err(ApiError::OAuthAuthorizationNotFound(request.id.to_string()));
+    };
+
+    let Some(user) = User::get(oauth_app.created_by, &global.database).await? else {
+        return Err(ApiError::OAuthAuthorizationNotFound(request.id.to_string()));
+    };
+
+    Ok(Json(models::OauthAuthorized {
+        id: app.id,
+        name: oauth_app.name,
+        scopes: OauthScope::from(app.scopes).as_vec(),
+        created_by: user.login,
+        last_used_at: app.updated_at,
+    }))
 }
 
 /// Get info about an OAuth app you created

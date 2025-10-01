@@ -1,6 +1,6 @@
-import root from './root.svelte';
-import cell from './cell.svelte';
+import Root from './root.svelte';
+import Cell from './cell.svelte';
 import cellContainer from './cellContainer.svelte';
-import separator from './separator.svelte';
+import Separator from './separator.svelte';
 
-export default { root, cell, cellContainer, separator };
+export default { Root, Cell, cellContainer, Separator };

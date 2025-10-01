@@ -102,6 +102,7 @@ async fn login(
         identifier: user.login,
         code,
         is_login: true,
+        is_sudo: false,
     };
 
     global.mailer.send(&user.email, email).await?;
@@ -132,6 +133,7 @@ async fn register(global: Arc<GlobalState>, email: String) -> HttpResult<Json<Au
         identifier: email.clone(),
         code: code.to_string(),
         is_login: false,
+        is_sudo: false,
     };
 
     global.mailer.send(&email, mailer_email).await?;

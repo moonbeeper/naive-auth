@@ -138,7 +138,7 @@
 			<Field form={recoveryForm} name="recovery">
 				<Control>
 					{#snippet children({ props })}
-						<PinInput.root
+						<PinInput.Root
 							{...props}
 							maxlength={10}
 							pattern="mixed"
@@ -152,17 +152,17 @@
 							{#snippet children({ cells })}
 								<PinInput.cellContainer>
 									{#each cells.slice(0, 5) as cell}
-										<PinInput.cell {cell} />
+										<PinInput.Cell {cell} />
 									{/each}
 								</PinInput.cellContainer>
-								<PinInput.separator />
+								<PinInput.Separator />
 								<PinInput.cellContainer>
 									{#each cells.slice(5, 10) as cell}
-										<PinInput.cell {cell} />
+										<PinInput.Cell {cell} />
 									{/each}
 								</PinInput.cellContainer>
 							{/snippet}
-						</PinInput.root>
+						</PinInput.Root>
 					{/snippet}
 				</Control>
 			</Field>
@@ -182,7 +182,7 @@
 			<Field form={codeForm} name="code">
 				<Control>
 					{#snippet children({ props })}
-						<PinInput.root
+						<PinInput.Root
 							{...props}
 							maxlength={6}
 							pattern="digits"
@@ -194,17 +194,17 @@
 							{#snippet children({ cells })}
 								<PinInput.cellContainer>
 									{#each cells.slice(0, 3) as cell}
-										<PinInput.cell {cell} />
+										<PinInput.Cell {cell} />
 									{/each}
 								</PinInput.cellContainer>
-								<PinInput.separator />
+								<PinInput.Separator />
 								<PinInput.cellContainer>
 									{#each cells.slice(3, 6) as cell}
-										<PinInput.cell {cell} />
+										<PinInput.Cell {cell} />
 									{/each}
 								</PinInput.cellContainer>
 							{/snippet}
-						</PinInput.root>
+						</PinInput.Root>
 					{/snippet}
 				</Control>
 			</Field>

@@ -10,15 +10,15 @@ export const load: PageLoad = async ({ fetch }) => {
 	redirectIfNotAuthenticated();
 
 	return {
-		sessions: await getSessions(fetch)
+		apps: await getApps(fetch)
 	};
 };
 
-async function getSessions(
+async function getApps(
 	fetch: typeof globalThis.fetch
-): Promise<components['schemas']['TinySession'][]> {
+): Promise<components['schemas']['OauthApp'][]> {
 	try {
-		const res = await client.GET('/v1/session/list', { fetch });
+		const res = await client.GET('/v1/oauth/apps', { fetch });
 
 		if (res.error) {
 			return [];

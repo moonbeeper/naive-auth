@@ -39,11 +39,13 @@
 		]
 	},
 	"dependencies": {
+		"@fontsource-variable/jetbrains-mono": "^5.2.8",
 		"@fontsource-variable/manrope": "^5.2.6",
 		"@lucide/svelte": "^0.544.0",
 		"bits-ui": "^2.9.6",
 		"formsnap": "^2.0.1",
 		"openapi-fetch": "^0.14.0",
+		"svelte-copy": "^2.0.0",
 		"sveltekit-superforms": "^2.27.1",
 		"zod": "4.0.10"
 	},

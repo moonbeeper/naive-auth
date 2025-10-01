@@ -17,11 +17,12 @@
 	import { Control, Field } from 'formsnap';
 	import { defaults, setError, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
-	import { LaptopMinimal, Smartphone, Trash } from '@lucide/svelte';
+	import { LaptopMinimal, Smartphone, Trash, X } from '@lucide/svelte';
 	import type { PageProps } from './$types';
 	import Spinner from '$comps/spinner.svelte';
 	import Button from '$comps/button.svelte';
 	import FieldErrors from '$comps/forms/fieldErrors.svelte';
+	import { blur, crossfade, fade, fly, slide } from 'svelte/transition';
 
 	let { data }: PageProps = $props();
 
@@ -45,10 +46,12 @@
 					setError(f, 'new_password', res.error.message);
 				} else if (res.error?.error === ('PasswordMatchesOld' as ApiHttpError)) {
 					setError(f, 'new_password', res.error.message);
+				} else if (res.error) {
+					console.error(res.error);
 				}
 
 				if (res.response.ok) {
-					await goto('/settings');
+					invalidateAll();
 				}
 			}
 		}
@@ -88,6 +91,7 @@
 		if (res.error) {
 			loadingDeleteAllSessions = false;
 			console.error(res.error);
+			invalidateAll();
 		}
 
 		if (res.response.ok) {
@@ -114,6 +118,7 @@
 		} else if (res.error) {
 			loadingDeleteSession[id] = false;
 			console.error(res.error);
+			invalidateAll();
 		}
 
 		if (res.response.ok) {
@@ -123,91 +128,92 @@
 	}
 </script>
 
-<div class="page">
-	<div class="section">
-		<div class="title">
-			<h2>Change Password</h2>
-		</div>
-		<form class="form" use:enhance>
-			<Field {form} name="old_password">
-				<FieldContainer>
-					<Control>
-						{#snippet children({ props })}
-							<Label>Current Password</Label>
-							<Input
-								disabled={$delayed}
-								type="password"
-								placeholder="•••••••••••••"
-								big
-								autocomplete="off"
-								bind:value={$formData.old_password}
-								{...props}
-							/>
-						{/snippet}
-					</Control>
-					<FieldErrors />
-				</FieldContainer>
-			</Field>
-			<Field {form} name="new_password">
-				<FieldContainer>
-					<Control>
-						{#snippet children({ props })}
-							<Label>New Password</Label>
-							<Input
-								disabled={$delayed}
-								type="password"
-								placeholder="•••••••••••••"
-								big
-								autocomplete="off"
-								bind:value={$formData.new_password}
-								{...props}
-							/>
-						{/snippet}
-					</Control>
-					<FieldErrors />
-				</FieldContainer>
-			</Field>
-			<Button big primary full_width type="submit" disabled={$delayed} loading={$delayed}>
-				{#snippet icon()}
-					{#if $delayed}
-						<Spinner dark />
-					{/if}
-				{/snippet}
-
-				Change Password
-			</Button>
-		</form>
-
-		<div class="reset_password">
-			<Button
-				small
-				onclick={resetPassword}
-				disabled={resetPasswordLoading}
-				loading={resetPasswordLoading}
-			>
-				{#snippet icon()}
-					{#if resetPasswordLoading}
-						<Spinner />
-					{/if}
-				{/snippet}
-				I forgot my password
-			</Button>
-			{#if resetPasswordEmailSent}
-				<p>
-					<strong>Check your email.</strong> We've just sent you a reset link.
-				</p>
-			{/if}
-			{#if resetPasswordEmailFailed}
-				<p>Something went wrong :(</p>
-			{/if}
-		</div>
+<div class="section">
+	<div class="title">
+		<h2>Change Password</h2>
 	</div>
+	<form class="form" use:enhance>
+		<Field {form} name="old_password">
+			<FieldContainer>
+				<Control>
+					{#snippet children({ props })}
+						<Label>Current Password</Label>
+						<Input
+							disabled={$delayed}
+							type="password"
+							placeholder="•••••••••••••"
+							big
+							autocomplete="off"
+							bind:value={$formData.old_password}
+							{...props}
+						/>
+					{/snippet}
+				</Control>
+				<FieldErrors />
+			</FieldContainer>
+		</Field>
+		<Field {form} name="new_password">
+			<FieldContainer>
+				<Control>
+					{#snippet children({ props })}
+						<Label>New Password</Label>
+						<Input
+							disabled={$delayed}
+							type="password"
+							placeholder="•••••••••••••"
+							big
+							autocomplete="off"
+							bind:value={$formData.new_password}
+							{...props}
+						/>
+					{/snippet}
+				</Control>
+				<FieldErrors />
+			</FieldContainer>
+		</Field>
+		<Button big primary full_width type="submit" disabled={$delayed} loading={$delayed}>
+			{#snippet icon()}
+				{#if $delayed}
+					<span transition:slide={{ axis: 'x' }}>
+						<Spinner dark />
+					</span>
+				{/if}
+			{/snippet}
 
-	<div class="section">
-		<div class="title">
-			<h2>Open Sessions</h2>
-		</div>
+			Change Password
+		</Button>
+	</form>
 
+	<div class="reset_password">
+		<Button
+			small
+			onclick={resetPassword}
+			disabled={resetPasswordLoading}
+			loading={resetPasswordLoading}
+		>
+			{#snippet icon()}
+				{#if resetPasswordLoading}
+					<span transition:slide={{ axis: 'x' }}>
+						<Spinner />
+					</span>
+				{/if}
+			{/snippet}
+			I forgot my password
+		</Button>
+		{#if resetPasswordEmailSent}
+			<p>
+				<strong>Check your email.</strong> We've just sent you a reset link.
+			</p>
+		{/if}
+		{#if resetPasswordEmailFailed}
+			<p>Something went wrong :(</p>
+		{/if}
+	</div>
+</div>
+
+<div class="section">
+	<div class="title">
+		<h2>Open Sessions</h2>
 		<Button
 			bad
 			onclick={deleteAllSessions}
@@ -216,55 +222,83 @@
 		>
 			{#snippet icon()}
 				{#if loadingDeleteAllSessions}
-					<Spinner />
+					<span transition:slide={{ axis: 'x' }}>
+						<Spinner dark />
+					</span>
+				{:else}
+					<Trash size="16" />
 				{/if}
 			{/snippet}
-			Delete all open sessions
+			Delete all
 		</Button>
-
-		{#await data.sessions}
-			<p>Loading...</p>
-		{:then sessions}
-			{#each sessions ?? [] as session}
-				<div class="session">
-					{#if session.os === 'Android'}
-						<Smartphone class="icon" />
-					{:else}
-						<LaptopMinimal class="icon" />
-					{/if}
-
-					<div class="info">
-						<span>{session.os}</span>
-						{#if session.current}
-							<span>-> <strong>Current session</strong></span>
-						{/if}
-						<span>Expires on the {new Date(session.active_expires_at).toLocaleString()}</span>
-					</div>
-
-					<div class="buttons">
-						<Button
-							bad
-							onclick={() => deleteSession(session.id)}
-							disabled={session.current || loadingDeleteSession[session.id]}
-							loading={loadingDeleteSession[session.id]}
-						>
-							{#snippet icon()}
-								<Trash class="icon" />
-							{/snippet}
-						</Button>
-					</div>
-				</div>
-			{/each}
-		{:catch error}
-			<p>Something went wrong while loading your sessions :(</p>
-			<p>{error}</p>
-		{/await}
 	</div>
+
+	{#await data.sessions}
+		<div style="margin-inline: auto;">
+			<Spinner />
+		</div>
+	{:then sessions}
+		{#each sessions ?? [] as session}
+			<div class="session">
+				{#if session.os === 'Android'}
+					<Smartphone class="icon" />
+				{:else}
+					<LaptopMinimal class="icon" />
+				{/if}
+
+				<div class="info">
+					<span>{session.os}</span>
+					{#if session.current}
+						<span>-> <strong>Current session</strong></span>
+					{/if}
+					<span>Expires on the {new Date(session.active_expires_at).toLocaleString()}</span>
+				</div>
+
+				<div class="buttons">
+					<Button
+						class="desktop"
+						bad
+						onclick={() => deleteSession(session.id)}
+						disabled={session.current || loadingDeleteSession[session.id]}
+						loading={loadingDeleteSession[session.id]}
+					>
+						{#snippet icon()}
+							{#if loadingDeleteSession[session.id]}
+								<Spinner />
+							{:else}
+								<X class="icon" size="20" />
+							{/if}
+						{/snippet}
+
+						Delete Session
+					</Button>
+					<Button
+						bad
+						onclick={() => deleteSession(session.id)}
+						disabled={session.current || loadingDeleteSession[session.id]}
+						loading={loadingDeleteSession[session.id]}
+						class="phone"
+					>
+						{#snippet icon()}
+							{#if loadingDeleteSession[session.id]}
+								<Spinner />
+							{:else}
+								<X class="icon" size="20" />
+							{/if}
+						{/snippet}
+					</Button>
+				</div>
+			</div>
+		{/each}
+	{:catch error}
+		<p>Something went wrong while loading your sessions :(</p>
+		<p>{error}</p>
+	{/await}
 </div>
 
 <style lang="scss">
 	.section {
-		display: flex;
+		display: grid;
 		gap: 1rem;
 		flex-direction: column;
 
@@ -274,10 +308,12 @@
 				font-weight: 600;
 			}
 
-			display: flex;
+			display: grid;
 			margin-bottom: 0.75rem;
 			border-bottom: 1px solid var(--bg-semidark);
 			padding-bottom: 0.75rem;
+			align-items: center;
+			grid-template-columns: 1fr auto;
 		}
 	}
 
@@ -298,19 +334,19 @@
 		}
 	}
 
-	.page {
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-	}
-
 	.session {
-		display: flex;
+		display: grid;
 		justify-content: flex-start;
+		grid-template-columns: 24px 1fr auto;
 		gap: 1rem;
 		padding: 1rem;
 		border-radius: 8px;
 		border: 1px solid var(--bg-semidark);
+		transition: border 0.1s ease-out;
+
+		&:hover {
+			border: 1px solid var(--bg-notdark);
+		}
 
 		:global(.icon) {
 			width: 24px;
@@ -331,6 +367,20 @@
 				width: 20px;
 				height: 20px;
 				flex-shrink: 0;
+			}
+
+			:global(.desktop) {
+				display: none;
+			}
+
+			@media (min-width: 768px) {
+				:global(.desktop) {
+					display: flex;
+				}
+
+				:global(.phone) {
+					display: none;
+				}
 			}
 		}
 	}

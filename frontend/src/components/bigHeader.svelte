@@ -28,11 +28,11 @@
 		gap: 1rem;
 	}
 
-	.separator {
-		background-color: var(--bg-notdark); // looks better lol
-		width: 1px;
-		height: 80%;
-	}
+	// .separator {
+	// 	background-color: var(--bg-notdark); // looks better lol
+	// 	width: 1px;
+	// 	height: 80%;
+	// }
 
 	h1 {
 		flex: 1 0 auto; // woops, seems this makes it have the correct bounding box in the devtools

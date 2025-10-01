@@ -14,8 +14,8 @@ pub static TERA: LazyLock<Tera> = LazyLock::new(|| {
         if let Some(file) = Templates::get(&filename) {
             let data =
                 std::str::from_utf8(file.data.as_ref()).expect("valid utf-8 on html templates");
-            // println!("aaa :{filename}");
-            match tera.add_raw_template(&filename, data.into()) {
+
+            match tera.add_raw_template(&filename, data) {
                 Ok(t) => t,
                 Err(e) => {
                     println!("Template parsing error(s): {e}");
@@ -44,6 +44,7 @@ pub enum AuthEmails {
         identifier: String,
         code: String,
         is_login: bool,
+        is_sudo: bool,
     },
     // OtpRecoverRequest {
     //     login: String,
@@ -98,10 +99,12 @@ impl EmailResource for AuthEmails {
                 identifier: login,
                 is_login,
                 code,
+                is_sudo,
             } => {
                 context.insert("login", login);
                 context.insert("code", code);
                 context.insert("is_login", is_login);
+                context.insert("is_sudo", is_sudo);
                 // format!("Hi there {login}\nyour verification code is {code}")
             }
             Self::NewLogin { login, metadata } => {
